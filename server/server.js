@@ -143,7 +143,7 @@ app.use('/api/v2', async (req, res) => {
 });
 
 // Serve static files if dist folder exists
-const distPath = path.join(__dirname, 'dist');
+const distPath = path.join(__dirname, '..', 'dist');
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
   app.get('*', (req, res) => {
