@@ -30,6 +30,8 @@ app.use('/api', (req, res, next) => {
 // qBittorrent configuration
 const qbHost = process.env.QBITTORRENT_HOST || 'localhost';
 const qbPort = process.env.QBITTORRENT_PORT || 8080;
+const qbUser = process.env.QBITTORRENT_USERNAME || '';
+const qbPass = process.env.QBITTORRENT_PASSWORD || '';
 
 // Store cookie globally
 let sessionCookie = null;
@@ -67,7 +69,7 @@ async function makeQbRequest(method, path, data, headers = {}) {
     return response;
   } catch (error) {
     // If 401, try to login and retry
-    if (error.response && error.response.status === 401) {
+    if (error.response && (error.response.status === 401 || error.response.status === 403)) {
       console.log('Got 401, attempting login...');
       
       // Try to login with empty credentials for local bypass
@@ -75,7 +77,7 @@ async function makeQbRequest(method, path, data, headers = {}) {
         const loginResponse = await axios({
           method: 'POST',
           url: `http://${qbHost}:${qbPort}/api/v2/auth/login`,
-          data: 'username=&password=',
+          data: `username=${encodeURIComponent(qbUser)}&password=${encodeURIComponent(qbPass)}`,
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded'
           }
@@ -96,7 +98,7 @@ async function makeQbRequest(method, path, data, headers = {}) {
           }
         }
         
-        // If no cookie but login OK, we're in bypass mode
+        // If no cookie but login OK, we're in bypass mode or basic auth succeeded
         if (loginResponse.data === 'Ok.') {
           console.log('Login OK - bypass mode');
           sessionCookie = ''; // Clear cookie for bypass mode
@@ -161,7 +163,7 @@ app.listen(PORT, HOST, async () => {
   
   // Try initial login
   try {
-    await makeQbRequest('POST', '/auth/login', 'username=&password=', {
+    await makeQbRequest('POST', '/auth/login', `username=${encodeURIComponent(qbUser)}&password=${encodeURIComponent(qbPass)}`, {
       'Content-Type': 'application/x-www-form-urlencoded'
     });
     console.log('Initial authentication successful');

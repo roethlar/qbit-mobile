@@ -17,6 +17,8 @@ APP_DIR="/opt/qbit-mobile"
 SERVICE_NAME="qbit-mobile"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 ENV_FILE="${APP_DIR}/.env"
+SERVICE_USER="qbitmobile"
+SERVICE_GROUP="${SERVICE_USER}"
 
 # Function to print colored messages
 print_msg() {
@@ -97,25 +99,122 @@ npm run build
 print_msg "Cleaning up dev dependencies..."
 npm ci --production || npm install --production
 
-# Create/update .env file if it doesn't exist
-if [ ! -f "${ENV_FILE}" ]; then
-    print_msg "Creating .env file..."
+# Ensure service user/group exist (for broader distro support)
+print_msg "Ensuring service user exists..."
+NOLOGIN_BIN=$(command -v nologin || command -v /usr/sbin/nologin || echo "/usr/sbin/nologin")
+if ! getent group "${SERVICE_GROUP}" >/dev/null 2>&1; then
+    if ! groupadd --system "${SERVICE_GROUP}" 2>/dev/null; then
+        groupadd "${SERVICE_GROUP}"
+    fi
+fi
+if ! id -u "${SERVICE_USER}" >/dev/null 2>&1; then
+    if ! useradd --system --no-create-home --home-dir "${APP_DIR}" --shell "${NOLOGIN_BIN}" --gid "${SERVICE_GROUP}" "${SERVICE_USER}" 2>/dev/null; then
+        useradd -M -d "${APP_DIR}" -s "${NOLOGIN_BIN}" -g "${SERVICE_GROUP}" "${SERVICE_USER}"
+    fi
+fi
+
+# Interactive environment setup for novice users
+print_msg "Setting up environment (.env)"
+
+confirm_overwrite_env() {
+    while true; do
+        read -r -p "A .env already exists. Overwrite it? [y/N]: " yn
+        case $yn in
+            [Yy]*) return 0 ;;
+            ""|[Nn]*) return 1 ;;
+        esac
+    done
+}
+
+prompt_with_default() {
+    local prompt="$1"
+    local default="$2"
+    local var
+    read -r -p "$prompt [$default]: " var || var=""
+    if [ -z "$var" ]; then
+        echo "$default"
+    else
+        echo "$var"
+    fi
+}
+
+validate_port() {
+    local p="$1"
+    if [[ "$p" =~ ^[0-9]+$ ]] && [ "$p" -ge 1 ] && [ "$p" -le 65535 ]; then
+        return 0
+    fi
+    return 1
+}
+
+write_env_file() {
+    local app_port="$1"
+    local app_host="$2"
+    local qb_host="$3"
+    local qb_port="$4"
+    local qb_user="$5"
+    local qb_pass="$6"
     cat > "${ENV_FILE}" << EOF
 NODE_ENV=production
-PORT=3000
-HOST=0.0.0.0
-QBITTORRENT_HOST=localhost
-QBITTORRENT_PORT=8080
+PORT=${app_port}
+HOST=${app_host}
+QBITTORRENT_HOST=${qb_host}
+QBITTORRENT_PORT=${qb_port}
+QBITTORRENT_USERNAME=${qb_user}
+QBITTORRENT_PASSWORD=${qb_pass}
 EOF
-    print_warning "Please edit ${ENV_FILE} to configure your qBittorrent connection"
+}
+
+if [ -f "${ENV_FILE}" ]; then
+    if confirm_overwrite_env; then
+        overwrite_env=true
+    else
+        overwrite_env=false
+    fi
 else
-    print_msg ".env file already exists, skipping..."
+    overwrite_env=true
+fi
+
+if [ "$overwrite_env" = true ]; then
+    print_msg "Let's collect a few settings. Press Enter for defaults."
+
+    # App settings
+    while true; do
+        APP_PORT=$(prompt_with_default "Web UI port" "3000")
+        if validate_port "$APP_PORT"; then break; fi
+        print_warning "Invalid port. Enter a number 1-65535."
+    done
+    APP_HOST=$(prompt_with_default "Web UI host to bind" "0.0.0.0")
+
+    # qBittorrent settings
+    QB_HOST=$(prompt_with_default "qBittorrent host" "localhost")
+    while true; do
+        QB_PORT=$(prompt_with_default "qBittorrent Web UI port" "8080")
+        if validate_port "$QB_PORT"; then break; fi
+        print_warning "Invalid port. Enter a number 1-65535."
+    done
+
+    echo "If your qBittorrent requires login, enter credentials."
+    echo "Leave blank to attempt local bypass (no auth)."
+    read -r -p "qBittorrent username: " QB_USER || QB_USER=""
+    if [ -n "$QB_USER" ]; then
+        read -r -s -p "qBittorrent password: " QB_PASS
+        echo
+    else
+        QB_PASS=""
+    fi
+
+    print_msg "Writing ${ENV_FILE}..."
+    write_env_file "$APP_PORT" "$APP_HOST" "$QB_HOST" "$QB_PORT" "$QB_USER" "$QB_PASS"
+else
+    print_msg ".env file already exists; keeping current values."
 fi
 
 # Set proper permissions
 print_msg "Setting permissions..."
-chmod 755 "${APP_DIR}"
-chmod 644 "${ENV_FILE}"
+chown -R "${SERVICE_USER}:${SERVICE_GROUP}" "${APP_DIR}"
+chmod 750 "${APP_DIR}"
+chmod 640 "${ENV_FILE}"
+
 
 # Create systemd service
 print_msg "Creating systemd service..."
@@ -127,8 +226,8 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=nobody
-Group=nobody
+User=${SERVICE_USER}
+Group=${SERVICE_GROUP}
 WorkingDirectory=${APP_DIR}
 Environment="NODE_ENV=production"
 ExecStart=/usr/bin/node ${APP_DIR}/server/server.js

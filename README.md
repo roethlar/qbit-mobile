@@ -39,10 +39,10 @@ sudo ./uninstall.sh
 ```
 
 The deployment script will:
-- Install dependencies
-- Build the frontend
-- Create a systemd service
-- Start the application on port 3000
+- Install dependencies and build the frontend
+- Interactively collect settings and write `.env`
+- Create a dedicated system user `qbitmobile` for the service
+- Create and start a systemd service `qbit-mobile`
 
 ### Manual Installation
 
@@ -66,6 +66,7 @@ npm run build
 ```bash
 cp .env.example .env
 # Edit .env with your qBittorrent settings
+# Or simply run sudo ./deploy.sh for an interactive setup on the target machine
 ```
 
 5. Start the server:
@@ -75,7 +76,7 @@ npm start
 
 ## Configuration
 
-Edit the `.env` file to configure the connection to qBittorrent:
+Edit the `.env` file to configure the connection to qBittorrent (the deploy script will help you create this interactively):
 
 ```env
 NODE_ENV=production
@@ -83,6 +84,8 @@ PORT=3000                      # Port for the web interface
 HOST=0.0.0.0                  # Host to bind to
 QBITTORRENT_HOST=localhost    # qBittorrent host
 QBITTORRENT_PORT=8080         # qBittorrent WebUI port
+QBITTORRENT_USERNAME=         # optional; leave blank for local bypass
+QBITTORRENT_PASSWORD=         # optional; leave blank for local bypass
 ```
 
 ### qBittorrent Configuration
@@ -145,3 +148,9 @@ Pull requests are welcome! Please feel free to submit a PR.
 ## Issues
 
 If you encounter any issues, please report them on the [GitHub issues page](https://github.com/yourusername/qbit-mobile/issues).
+
+## Notes on Compatibility and Security
+
+- Dedicated user: The service runs as a dedicated system user `qbitmobile` rather than `nobody`, which improves compatibility on distributions like Arch and follows least-privilege best practices.
+- Permissions: The app directory `/opt/qbit-mobile` is owned by `qbitmobile:qbitmobile` with mode `750`, and the `.env` is `640`. This allows the service to read configuration while keeping it private from other users.
+- Write access: The service has write access only to the `dist/` directory (configured via systemd `ReadWritePaths`), and otherwise runs with systemd hardening options enabled.
