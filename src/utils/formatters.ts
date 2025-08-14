@@ -94,38 +94,38 @@ export function getStateColor(state: string): string {
 export function getStateText(state: string): string {
   switch (state) {
     case 'downloading':
-      return 'Downloading';
+      return '↓';
     case 'uploading':
-      return 'Seeding';
+      return '↑';
     case 'pausedDL':
-      return 'Paused';
+      return '⏸';
     case 'pausedUP':
-      return 'Paused';
+      return '⏸';
     case 'queuedDL':
-      return 'Queued';
+      return '⏳';
     case 'queuedUP':
-      return 'Queued';
+      return '⏳';
     case 'stalledDL':
-      return 'Stalled';
+      return '⚠';
     case 'stalledUP':
-      return 'Stalled';
+      return '⚠';
     case 'checkingDL':
     case 'checkingUP':
     case 'checkingResumeData':
-      return 'Checking';
+      return '🔍';
     case 'error':
-      return 'Error';
+      return '❌';
     case 'missingFiles':
-      return 'Missing Files';
+      return '❓';
     case 'allocating':
-      return 'Allocating';
+      return '💾';
     case 'metaDL':
-      return 'Downloading Metadata';
+      return '📥';
     case 'forcedDL':
-      return 'Downloading (Forced)';
+      return '⬇️';
     case 'forcedUP':
-      return 'Seeding (Forced)';
+      return '⬆️';
     default:
-      return state.charAt(0).toUpperCase() + state.slice(1);
+      return '●';
   }
 }

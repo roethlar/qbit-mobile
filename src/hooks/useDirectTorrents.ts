@@ -7,6 +7,8 @@ export function useDirectTorrents() {
     queryFn: api.getTorrents,
     refetchInterval: 5000,
     staleTime: 3000,
+    placeholderData: (previousData) => previousData,
+    retry: false, // Don't retry immediately on error
   });
 }
 
@@ -16,6 +18,8 @@ export function useDirectGlobalStats() {
     queryFn: api.getGlobalStats,
     refetchInterval: 5000,
     staleTime: 3000,
+    placeholderData: (previousData) => previousData,
+    retry: false, // Don't retry immediately on error
   });
 }
 

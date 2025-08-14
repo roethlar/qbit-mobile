@@ -344,9 +344,9 @@ export function CompactTorrentList({ torrents, onPause, onResume, onDelete, onTo
 
       {/* Compact Torrent List */}
       <div className="flex-1 overflow-auto">
-        {paginatedTorrents.map((torrent) => (
+        {paginatedTorrents.map((torrent, index) => (
           <CompactTorrentRow
-            key={torrent.hash}
+            key={`${torrent.hash}-${sortBy}-${sortOrder}-${index}`}
             torrent={torrent}
             onClick={() => handleTorrentClick(torrent)}
             onActionClick={(e) => handleActionClick(torrent, e)}
@@ -507,25 +507,6 @@ function CompactTorrentRow({ torrent, onClick, onActionClick }: CompactTorrentRo
           </div>
           
           {/* Tags row */}
-          {torrent.tags && torrent.tags.trim() && (
-            <div className="flex items-center mt-1">
-              <Tag className="w-3 h-3 mr-1 text-gray-400" />
-              <div className="flex flex-wrap gap-1">
-                {torrent.tags.split(',').map((tag, index) => {
-                  const trimmedTag = tag.trim();
-                  if (!trimmedTag) return null;
-                  return (
-                    <span
-                      key={index}
-                      className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded text-xs font-medium"
-                    >
-                      {trimmedTag}
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </div>
         
         {/* Right side - Action button */}

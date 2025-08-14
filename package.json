@@ -4,11 +4,11 @@
   "description": "iOS-optimized qBittorrent web frontend",
   "type": "module",
   "scripts": {
-    "dev": "vite --config config/vite.config.ts",
-    "build": "vite build --config config/vite.config.ts",
-    "preview": "vite preview --config config/vite.config.ts",
-    "lint": "eslint . --config config/eslint.config.js --ext js,jsx,ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "typecheck": "tsc --noEmit --project config/tsconfig.json",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc --noEmit",
     "start": "node server/server.js",
     "clean": "rm -rf dist node_modules",
     "reinstall": "npm run clean && npm install"

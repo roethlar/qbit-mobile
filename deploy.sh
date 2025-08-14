@@ -72,7 +72,12 @@ cp .env.example "${APP_DIR}/"
 # Copy source files needed for build
 cp -r src/ "${APP_DIR}/"
 cp index.html "${APP_DIR}/"
-cp -r config/ "${APP_DIR}/"
+cp vite.config.ts "${APP_DIR}/"
+cp tsconfig.json "${APP_DIR}/"
+cp tsconfig.node.json "${APP_DIR}/"
+cp tailwind.config.js "${APP_DIR}/"
+cp postcss.config.js "${APP_DIR}/"
+cp eslint.config.js "${APP_DIR}/"
 cp -r public/ "${APP_DIR}/"
 
 print_msg "Copied essential files for build and runtime"
@@ -123,7 +128,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=nobody
-Group=nogroup
+Group=nobody
 WorkingDirectory=${APP_DIR}
 Environment="NODE_ENV=production"
 ExecStart=/usr/bin/node ${APP_DIR}/server/server.js

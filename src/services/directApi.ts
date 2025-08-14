@@ -21,7 +21,7 @@ export async function getTorrents(): Promise<Torrent[]> {
   } catch (error) {
     console.error('Failed to get torrents - full error:', error);
     console.error('Error response:', error.response);
-    return [];
+    throw error; // Let React Query handle the error instead of returning empty array
   }
 }
 

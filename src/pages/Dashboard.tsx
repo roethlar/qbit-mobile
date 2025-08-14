@@ -74,11 +74,11 @@ export function Dashboard({ onLogout }: DashboardProps) {
   };
 
   const filters = [
-    { key: 'all', label: 'All', count: torrents?.length || 0 },
-    { key: 'downloading', label: 'Downloading', count: torrents?.filter(t => ['downloading', 'stalledDL', 'queuedDL', 'metaDL'].includes(t.state)).length || 0 },
-    { key: 'seeding', label: 'Seeding', count: torrents?.filter(t => ['uploading', 'stalledUP', 'queuedUP'].includes(t.state)).length || 0 },
-    { key: 'paused', label: 'Paused', count: torrents?.filter(t => ['pausedDL', 'pausedUP'].includes(t.state)).length || 0 },
-    { key: 'completed', label: 'Completed', count: torrents?.filter(t => t.progress >= 1).length || 0 },
+    { key: 'all', label: '●', count: torrents?.length || 0 },
+    { key: 'downloading', label: '↓', count: torrents?.filter(t => ['downloading', 'stalledDL', 'queuedDL', 'metaDL'].includes(t.state)).length || 0 },
+    { key: 'seeding', label: '↑', count: torrents?.filter(t => ['uploading', 'stalledUP', 'queuedUP'].includes(t.state)).length || 0 },
+    { key: 'paused', label: '⏸', count: torrents?.filter(t => ['pausedDL', 'pausedUP'].includes(t.state)).length || 0 },
+    { key: 'completed', label: '✓', count: torrents?.filter(t => t.progress >= 1).length || 0 },
   ];
 
   // Auto-hide stats on scroll for more space

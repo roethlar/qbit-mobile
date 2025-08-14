@@ -31,6 +31,13 @@ cd qbit-mobile
 sudo ./deploy.sh
 ```
 
+### Uninstall
+
+```bash
+# To completely remove qBit Mobile
+sudo ./uninstall.sh
+```
+
 The deployment script will:
 - Install dependencies
 - Build the frontend
