@@ -60,21 +60,37 @@ fi
 print_msg "Creating application directory at ${APP_DIR}..."
 mkdir -p "${APP_DIR}"
 
-# Copy application files
+# Copy only necessary files for deployment
 print_msg "Copying application files..."
-cp -r ./* "${APP_DIR}/" 2>/dev/null || true
-cp .env.example "${APP_DIR}/.env.example" 2>/dev/null || true
+
+# Copy runtime files
+cp -r server/ "${APP_DIR}/"
+cp package.json "${APP_DIR}/"
+cp package-lock.json "${APP_DIR}/"
+cp .env.example "${APP_DIR}/"
+
+# Copy source files needed for build
+cp -r src/ "${APP_DIR}/"
+cp index.html "${APP_DIR}/"
+cp -r config/ "${APP_DIR}/"
+cp -r public/ "${APP_DIR}/"
+
+print_msg "Copied essential files for build and runtime"
 
 # Navigate to app directory
 cd "${APP_DIR}"
 
-# Install dependencies
+# Install all dependencies (including dev for build)
 print_msg "Installing dependencies..."
-npm ci --production || npm install --production
+npm ci || npm install
 
 # Build the frontend
 print_msg "Building frontend..."
 npm run build
+
+# Remove dev dependencies after build
+print_msg "Cleaning up dev dependencies..."
+npm ci --production || npm install --production
 
 # Create/update .env file if it doesn't exist
 if [ ! -f "${ENV_FILE}" ]; then
@@ -110,7 +126,7 @@ User=nobody
 Group=nogroup
 WorkingDirectory=${APP_DIR}
 Environment="NODE_ENV=production"
-ExecStart=/usr/bin/node ${APP_DIR}/server.js
+ExecStart=/usr/bin/node ${APP_DIR}/server/server.js
 Restart=always
 RestartSec=10
 
