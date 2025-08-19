@@ -48,7 +48,7 @@ The deployment script will:
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/qbit-mobile.git
+git clone https://github.com/roethlar/qbit-mobile.git
 cd qbit-mobile
 ```
 
