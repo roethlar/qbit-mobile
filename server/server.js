@@ -5,12 +5,16 @@ import express from 'express';
 import axios from 'axios';
 import path from 'path';
 import fs from 'fs';
+import multer from 'multer';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+
+// Setup multer for file uploads
+const upload = multer();
 
 // Middleware
 app.use(express.json());
@@ -30,8 +34,6 @@ app.use('/api', (req, res, next) => {
 // qBittorrent configuration
 const qbHost = process.env.QBITTORRENT_HOST || 'localhost';
 const qbPort = process.env.QBITTORRENT_PORT || 8080;
-const qbUser = process.env.QBITTORRENT_USERNAME || '';
-const qbPass = process.env.QBITTORRENT_PASSWORD || '';
 
 // Store cookie globally
 let sessionCookie = null;
@@ -69,7 +71,7 @@ async function makeQbRequest(method, path, data, headers = {}) {
     return response;
   } catch (error) {
     // If 401, try to login and retry
-    if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+    if (error.response && error.response.status === 401) {
       console.log('Got 401, attempting login...');
       
       // Try to login with empty credentials for local bypass
@@ -77,7 +79,7 @@ async function makeQbRequest(method, path, data, headers = {}) {
         const loginResponse = await axios({
           method: 'POST',
           url: `http://${qbHost}:${qbPort}/api/v2/auth/login`,
-          data: `username=${encodeURIComponent(qbUser)}&password=${encodeURIComponent(qbPass)}`,
+          data: 'username=&password=',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded'
           }
@@ -98,7 +100,7 @@ async function makeQbRequest(method, path, data, headers = {}) {
           }
         }
         
-        // If no cookie but login OK, we're in bypass mode or basic auth succeeded
+        // If no cookie but login OK, we're in bypass mode
         if (loginResponse.data === 'Ok.') {
           console.log('Login OK - bypass mode');
           sessionCookie = ''; // Clear cookie for bypass mode
@@ -113,7 +115,49 @@ async function makeQbRequest(method, path, data, headers = {}) {
   }
 }
 
-// Proxy all API requests
+// Special handler for torrent uploads
+app.post('/api/v2/torrents/add', upload.any(), async (req, res) => {
+  console.log('Handling torrent upload');
+  console.log('Files:', req.files);
+  console.log('Body:', req.body);
+  
+  try {
+    const FormData = (await import('form-data')).default;
+    const formData = new FormData();
+    
+    // Add form fields
+    Object.entries(req.body).forEach(([key, value]) => {
+      if (value !== undefined && value !== '') {
+        formData.append(key, value);
+      }
+    });
+    
+    // Add files
+    if (req.files && req.files.length > 0) {
+      req.files.forEach(file => {
+        formData.append(file.fieldname, file.buffer, {
+          filename: file.originalname,
+          contentType: file.mimetype
+        });
+      });
+    }
+    
+    const response = await makeQbRequest('POST', '/torrents/add', formData, {
+      ...formData.getHeaders()
+    });
+    
+    res.status(response.status).send(response.data);
+  } catch (error) {
+    console.error('Torrent upload error:', error.message);
+    if (error.response) {
+      res.status(error.response.status).send(error.response.data);
+    } else {
+      res.status(500).json({ error: 'Upload failed' });
+    }
+  }
+});
+
+// Proxy all other API requests
 app.use('/api/v2', async (req, res) => {
   const path = req.url;
   console.log(`Proxying ${req.method} /api/v2${path}`);
@@ -163,7 +207,7 @@ app.listen(PORT, HOST, async () => {
   
   // Try initial login
   try {
-    await makeQbRequest('POST', '/auth/login', `username=${encodeURIComponent(qbUser)}&password=${encodeURIComponent(qbPass)}`, {
+    await makeQbRequest('POST', '/auth/login', 'username=&password=', {
       'Content-Type': 'application/x-www-form-urlencoded'
     });
     console.log('Initial authentication successful');

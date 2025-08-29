@@ -49,14 +49,16 @@ export function useDirectTorrentActions() {
   });
 
   const addTorrentUrl = useMutation({
-    mutationFn: (url: string) => api.addTorrentUrl(url),
+    mutationFn: ({ url, options }: { url: string; options?: api.AddTorrentOptions }) => 
+      api.addTorrentUrl(url, options),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['torrents'] });
     },
   });
 
   const addTorrentFile = useMutation({
-    mutationFn: (file: File) => api.addTorrentFile(file),
+    mutationFn: ({ file, options }: { file: File; options?: api.AddTorrentOptions }) => 
+      api.addTorrentFile(file, options),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['torrents'] });
     },
