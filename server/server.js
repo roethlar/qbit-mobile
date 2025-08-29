@@ -34,6 +34,8 @@ app.use('/api', (req, res, next) => {
 // qBittorrent configuration
 const qbHost = process.env.QBITTORRENT_HOST || 'localhost';
 const qbPort = process.env.QBITTORRENT_PORT || 8080;
+const qbUser = process.env.QBITTORRENT_USERNAME || '';
+const qbPass = process.env.QBITTORRENT_PASSWORD || '';
 
 // Store cookie globally
 let sessionCookie = null;
@@ -74,12 +76,16 @@ async function makeQbRequest(method, path, data, headers = {}) {
     if (error.response && error.response.status === 401) {
       console.log('Got 401, attempting login...');
       
-      // Try to login with empty credentials for local bypass
+      // Try to login with configured credentials or bypass
       try {
+        const loginData = qbUser ? 
+          `username=${encodeURIComponent(qbUser)}&password=${encodeURIComponent(qbPass)}` :
+          'username=&password=';
+        
         const loginResponse = await axios({
           method: 'POST',
           url: `http://${qbHost}:${qbPort}/api/v2/auth/login`,
-          data: 'username=&password=',
+          data: loginData,
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded'
           }
@@ -100,10 +106,10 @@ async function makeQbRequest(method, path, data, headers = {}) {
           }
         }
         
-        // If no cookie but login OK, we're in bypass mode
+        // If no cookie but login OK, we're in bypass mode or auth succeeded
         if (loginResponse.data === 'Ok.') {
-          console.log('Login OK - bypass mode');
-          sessionCookie = ''; // Clear cookie for bypass mode
+          console.log(qbUser ? 'Login OK with credentials' : 'Login OK - bypass mode');
+          sessionCookie = ''; // Clear cookie for bypass mode or auth mode without cookies
           return await axios(config);
         }
       } catch (loginError) {
@@ -207,10 +213,15 @@ app.listen(PORT, HOST, async () => {
   
   // Try initial login
   try {
-    await makeQbRequest('POST', '/auth/login', 'username=&password=', {
+    const loginData = qbUser ? 
+      `username=${encodeURIComponent(qbUser)}&password=${encodeURIComponent(qbPass)}` :
+      'username=&password=';
+    
+    await makeQbRequest('POST', '/auth/login', loginData, {
       'Content-Type': 'application/x-www-form-urlencoded'
     });
     console.log('Initial authentication successful');
+    console.log(`Auth mode: ${qbUser ? 'Username/Password' : 'Local bypass'}`);
   } catch (error) {
     console.log('Initial authentication skipped:', error.message);
   }

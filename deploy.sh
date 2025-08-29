@@ -17,8 +17,6 @@ APP_DIR="/opt/qbit-mobile"
 SERVICE_NAME="qbit-mobile"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 ENV_FILE="${APP_DIR}/.env"
-SERVICE_USER="qbitmobile"
-SERVICE_GROUP="${SERVICE_USER}"
 
 # Function to print colored messages
 print_msg() {
@@ -99,19 +97,44 @@ npm run build
 print_msg "Cleaning up dev dependencies..."
 npm ci --production || npm install --production
 
-# Ensure service user/group exist (for broader distro support)
-print_msg "Ensuring service user exists..."
-NOLOGIN_BIN=$(command -v nologin || command -v /usr/sbin/nologin || echo "/usr/sbin/nologin")
-if ! getent group "${SERVICE_GROUP}" >/dev/null 2>&1; then
-    if ! groupadd --system "${SERVICE_GROUP}" 2>/dev/null; then
-        groupadd "${SERVICE_GROUP}"
-    fi
-fi
-if ! id -u "${SERVICE_USER}" >/dev/null 2>&1; then
-    if ! useradd --system --no-create-home --home-dir "${APP_DIR}" --shell "${NOLOGIN_BIN}" --gid "${SERVICE_GROUP}" "${SERVICE_USER}" 2>/dev/null; then
-        useradd -M -d "${APP_DIR}" -s "${NOLOGIN_BIN}" -g "${SERVICE_GROUP}" "${SERVICE_USER}"
-    fi
-fi
+# Service user configuration
+print_msg "Service user configuration:"
+echo "1) nobody (minimal permissions, recommended for local use)"
+echo "2) custom user (creates dedicated user account)"
+while true; do
+    read -r -p "Choose service user type [1]: " user_choice
+    case ${user_choice:-1} in
+        1)
+            SERVICE_USER="nobody"
+            SERVICE_GROUP="nobody"
+            print_msg "Using nobody user (minimal permissions)"
+            break
+            ;;
+        2)
+            SERVICE_USER="qbitmobile"
+            SERVICE_GROUP="${SERVICE_USER}"
+            print_msg "Using custom user: ${SERVICE_USER}"
+            
+            # Ensure service user/group exist
+            print_msg "Creating service user..."
+            NOLOGIN_BIN=$(command -v nologin || command -v /usr/sbin/nologin || echo "/usr/sbin/nologin")
+            if ! getent group "${SERVICE_GROUP}" >/dev/null 2>&1; then
+                if ! groupadd --system "${SERVICE_GROUP}" 2>/dev/null; then
+                    groupadd "${SERVICE_GROUP}"
+                fi
+            fi
+            if ! id -u "${SERVICE_USER}" >/dev/null 2>&1; then
+                if ! useradd --system --no-create-home --home-dir "${APP_DIR}" --shell "${NOLOGIN_BIN}" --gid "${SERVICE_GROUP}" "${SERVICE_USER}" 2>/dev/null; then
+                    useradd -M -d "${APP_DIR}" -s "${NOLOGIN_BIN}" -g "${SERVICE_GROUP}" "${SERVICE_USER}"
+                fi
+            fi
+            break
+            ;;
+        *)
+            print_warning "Invalid choice. Enter 1 or 2."
+            ;;
+    esac
+done
 
 # Interactive environment setup for novice users
 print_msg "Setting up environment (.env)"
@@ -193,15 +216,37 @@ if [ "$overwrite_env" = true ]; then
         print_warning "Invalid port. Enter a number 1-65535."
     done
 
-    echo "If your qBittorrent requires login, enter credentials."
-    echo "Leave blank to attempt local bypass (no auth)."
-    read -r -p "qBittorrent username: " QB_USER || QB_USER=""
-    if [ -n "$QB_USER" ]; then
-        read -r -s -p "qBittorrent password: " QB_PASS
-        echo
-    else
-        QB_PASS=""
-    fi
+    # qBittorrent authentication configuration
+    echo ""
+    print_msg "qBittorrent authentication setup:"
+    echo "1) Local bypass (no authentication - recommended for localhost)"
+    echo "2) Username/Password authentication"
+    while true; do
+        read -r -p "Choose authentication method [1]: " auth_choice
+        case ${auth_choice:-1} in
+            1)
+                QB_USER=""
+                QB_PASS=""
+                print_msg "Using local bypass mode (no authentication)"
+                break
+                ;;
+            2)
+                read -r -p "qBittorrent username: " QB_USER
+                if [ -n "$QB_USER" ]; then
+                    read -r -s -p "qBittorrent password: " QB_PASS
+                    echo
+                    print_msg "Using username/password authentication"
+                else
+                    print_warning "Username cannot be empty for authentication mode"
+                    continue
+                fi
+                break
+                ;;
+            *)
+                print_warning "Invalid choice. Enter 1 or 2."
+                ;;
+        esac
+    done
 
     print_msg "Writing ${ENV_FILE}..."
     write_env_file "$APP_PORT" "$APP_HOST" "$QB_HOST" "$QB_PORT" "$QB_USER" "$QB_PASS"
@@ -211,9 +256,18 @@ fi
 
 # Set proper permissions
 print_msg "Setting permissions..."
-chown -R "${SERVICE_USER}:${SERVICE_GROUP}" "${APP_DIR}"
-chmod 750 "${APP_DIR}"
-chmod 640 "${ENV_FILE}"
+if [ "${SERVICE_USER}" = "nobody" ]; then
+    # For nobody user, set broader permissions since nobody may not own the files
+    chmod -R 755 "${APP_DIR}"
+    chmod 644 "${ENV_FILE}"
+    print_msg "Set broad permissions for nobody user"
+else
+    # For custom user, set restrictive permissions
+    chown -R "${SERVICE_USER}:${SERVICE_GROUP}" "${APP_DIR}"
+    chmod 750 "${APP_DIR}"
+    chmod 640 "${ENV_FILE}"
+    print_msg "Set restrictive permissions for ${SERVICE_USER}"
+fi
 
 
 # Create systemd service
@@ -273,12 +327,19 @@ if systemctl is-active --quiet "${SERVICE_NAME}"; then
     print_msg "========================================="
     print_msg "qBit Mobile has been deployed successfully!"
     print_msg ""
-    print_msg "Service status: systemctl status ${SERVICE_NAME}"
-    print_msg "View logs: journalctl -u ${SERVICE_NAME} -f"
-    print_msg "Restart service: systemctl restart ${SERVICE_NAME}"
+    print_msg "Configuration:"
+    print_msg "  Service user: ${SERVICE_USER}"
+    print_msg "  Web UI port: $(grep ^PORT= "${ENV_FILE}" | cut -d= -f2 2>/dev/null || echo "3000")"
+    print_msg "  qBittorrent: ${qbHost:-localhost}:$(grep ^QBITTORRENT_PORT= "${ENV_FILE}" | cut -d= -f2 2>/dev/null || echo "8080")"
+    print_msg "  Auth mode: $(if grep -q "^QBITTORRENT_USERNAME=.$" "${ENV_FILE}" 2>/dev/null; then echo "Username/Password"; else echo "Local bypass"; fi)"
     print_msg ""
-    print_msg "The application is running on port 3000"
-    print_msg "Access it at: http://$(hostname -I | awk '{print $1}'):3000"
+    print_msg "Management commands:"
+    print_msg "  Service status: systemctl status ${SERVICE_NAME}"
+    print_msg "  View logs: journalctl -u ${SERVICE_NAME} -f"
+    print_msg "  Restart service: systemctl restart ${SERVICE_NAME}"
+    print_msg ""
+    print_msg "Access the web interface at:"
+    print_msg "  http://$(hostname -I | awk '{print $1}'):$(grep ^PORT= "${ENV_FILE}" | cut -d= -f2 2>/dev/null || echo "3000")"
     print_msg "========================================="
 else
     print_error "Service failed to start. Check logs with: journalctl -u ${SERVICE_NAME} -n 50"
