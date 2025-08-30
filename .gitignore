@@ -31,6 +31,7 @@ dist-ssr
 .env.test.local
 .env.production.local
 .env.production
+vite.config.ts
 
 # Development artifacts and temporary files
 *.tmp
