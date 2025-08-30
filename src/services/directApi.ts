@@ -50,14 +50,41 @@ export async function deleteTorrent(hash: string, deleteFiles = false): Promise<
   }));
 }
 
-export async function addTorrentUrl(url: string): Promise<void> {
+export interface AddTorrentOptions {
+  savepath?: string;
+  category?: string;
+  paused?: boolean;
+  skip_checking?: boolean;
+  sequentialDownload?: boolean;
+  firstLastPiecePrio?: boolean;
+}
+
+export async function addTorrentUrl(url: string, options?: AddTorrentOptions): Promise<void> {
   const formData = new FormData();
   formData.append('urls', url);
+  
+  if (options) {
+    Object.entries(options).forEach(([key, value]) => {
+      if (value !== undefined) {
+        formData.append(key, value.toString());
+      }
+    });
+  }
+  
   await api.post('/torrents/add', formData);
 }
 
-export async function addTorrentFile(file: File): Promise<void> {
+export async function addTorrentFile(file: File, options?: AddTorrentOptions): Promise<void> {
   const formData = new FormData();
   formData.append('torrents', file);
+  
+  if (options) {
+    Object.entries(options).forEach(([key, value]) => {
+      if (value !== undefined) {
+        formData.append(key, value.toString());
+      }
+    });
+  }
+  
   await api.post('/torrents/add', formData);
 }

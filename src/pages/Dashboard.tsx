@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Plus, Settings, RefreshCw, Moon, Sun } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { Layout, Header, FloatingActionButton, Card } from '../components/Layout';
@@ -10,12 +10,17 @@ import type { AddTorrentOptions } from '../components/AddTorrent';
 
 interface DashboardProps {
   onLogout: () => void;
+  onShowSettings: () => void;
 }
 
-export function Dashboard({ onLogout }: DashboardProps) {
+export function Dashboard({ onLogout, onShowSettings }: DashboardProps) {
   const [showAddTorrent, setShowAddTorrent] = useState(false);
   const [filter, setFilter] = useState<string>('all');
   const [showStats, setShowStats] = useState(true);
+  const [addError, setAddError] = useState<string | null>(null);
+  const [addSuccess, setAddSuccess] = useState<string | null>(null);
+  const [isPullingToRefresh, setIsPullingToRefresh] = useState(false);
+  const scrollableRef = useRef<HTMLDivElement>(null);
   
   const { toggleTheme, isDark } = useTheme();
   const { data: torrents = [], isLoading, refetch, error } = useDirectTorrents();
@@ -53,23 +58,39 @@ export function Dashboard({ onLogout }: DashboardProps) {
     onLogout();
   };
 
-  const handleRefresh = () => {
-    refetch();
+  const handleRefresh = async () => {
+    setIsPullingToRefresh(true);
+    await refetch();
+    setTimeout(() => setIsPullingToRefresh(false), 300);
   };
 
   const handleAddTorrentUrl = async (url: string, options?: AddTorrentOptions) => {
     try {
-      await addTorrentUrl.mutateAsync(url);
-    } catch (error) {
+      setAddError(null);
+      setAddSuccess(null);
+      await addTorrentUrl.mutateAsync({ url, options });
+      setAddSuccess('Torrent added successfully!');
+      setTimeout(() => setAddSuccess(null), 3000);
+    } catch (error: any) {
       console.error('Failed to add torrent:', error);
+      const errorMsg = error?.response?.data?.error || error?.message || 'Failed to add torrent';
+      setAddError(errorMsg);
+      setTimeout(() => setAddError(null), 5000);
     }
   };
 
   const handleAddTorrentFile = async (file: File, options?: AddTorrentOptions) => {
     try {
-      await addTorrentFile.mutateAsync(file);
-    } catch (error) {
+      setAddError(null);
+      setAddSuccess(null);
+      await addTorrentFile.mutateAsync({ file, options });
+      setAddSuccess('Torrent file added successfully!');
+      setTimeout(() => setAddSuccess(null), 3000);
+    } catch (error: any) {
       console.error('Failed to add torrent:', error);
+      const errorMsg = error?.response?.data?.error || error?.message || 'Failed to add torrent file';
+      setAddError(errorMsg);
+      setTimeout(() => setAddError(null), 5000);
     }
   };
 
@@ -100,6 +121,13 @@ export function Dashboard({ onLogout }: DashboardProps) {
         title="qBit Mobile"
         rightButton={
           <div className="flex items-center space-x-1">
+            <button
+              onClick={onShowSettings}
+              className="p-1 text-gray-600 hover:text-gray-900 active:bg-gray-100 dark:text-gray-300 dark:hover:text-gray-100 dark:active:bg-gray-700 rounded transition-colors"
+              title="Settings"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
             <button
               onClick={toggleTheme}
               className="p-1 text-gray-600 hover:text-gray-900 active:bg-gray-100 dark:text-gray-300 dark:hover:text-gray-100 dark:active:bg-gray-700 rounded transition-colors"
@@ -143,6 +171,18 @@ export function Dashboard({ onLogout }: DashboardProps) {
           )}
         </div>
       </div>
+
+      {addError && (
+        <div className="mx-4 mb-4 p-3 bg-red-50 border border-red-200 rounded-xl">
+          <p className="text-red-800 text-sm font-medium">{addError}</p>
+        </div>
+      )}
+
+      {addSuccess && (
+        <div className="mx-4 mb-4 p-3 bg-green-50 border border-green-200 rounded-xl">
+          <p className="text-green-800 text-sm font-medium">{addSuccess}</p>
+        </div>
+      )}
 
       <div className="flex-1">
         <CompactTorrentList
