@@ -33,10 +33,11 @@ export class QBittorrentAPI {
     this.initPromise = (async () => {
       try {
         // Try empty login for local bypass
-        const response = await api.post('/auth/login', new URLSearchParams({
+        const params = new URLSearchParams({
           username: '',
           password: '',
-        }), {
+        });
+        const response = await api.post('/auth/login', params.toString(), {
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded'
           }
@@ -79,10 +80,13 @@ export class QBittorrentAPI {
 
   async login(username: string, password: string): Promise<LoginResponse> {
     try {
-      const response = await api.post('/auth/login', new URLSearchParams({
+      const params = new URLSearchParams({
         username,
         password,
-      }));
+      });
+      const response = await api.post('/auth/login', params.toString(), {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      });
 
       if (response.status === 200 && response.data === 'Ok.') {
         this.isAuthenticated = true;
@@ -182,18 +186,27 @@ export class QBittorrentAPI {
   }
 
   async pauseTorrent(hash: string): Promise<void> {
-    await api.post('/torrents/pause', new URLSearchParams({ hashes: hash }));
+    const params = new URLSearchParams({ hashes: hash });
+    await api.post('/torrents/pause', params.toString(), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
   }
 
   async resumeTorrent(hash: string): Promise<void> {
-    await api.post('/torrents/resume', new URLSearchParams({ hashes: hash }));
+    const params = new URLSearchParams({ hashes: hash });
+    await api.post('/torrents/resume', params.toString(), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
   }
 
   async deleteTorrent(hash: string, deleteFiles = false): Promise<void> {
-    await api.post('/torrents/delete', new URLSearchParams({
+    const params = new URLSearchParams({
       hashes: hash,
       deleteFiles: deleteFiles.toString()
-    }));
+    });
+    await api.post('/torrents/delete', params.toString(), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
   }
 
   async addTorrent(torrentData: string | File, options?: {
@@ -237,19 +250,28 @@ export class QBittorrentAPI {
   }
 
   async setTorrentPriority(hash: string, priority: 'increase' | 'decrease' | 'maxPrio' | 'minPrio'): Promise<void> {
-    await api.post(`/torrents/${priority}Prio`, new URLSearchParams({ hashes: hash }));
+    const params = new URLSearchParams({ hashes: hash });
+    await api.post(`/torrents/${priority}Prio`, params.toString(), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
   }
 
   async setGlobalDownloadLimit(limit: number): Promise<void> {
-    await api.post('/transfer/setDownloadLimit', new URLSearchParams({
+    const params = new URLSearchParams({
       limit: limit.toString()
-    }));
+    });
+    await api.post('/transfer/setDownloadLimit', params.toString(), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
   }
 
   async setGlobalUploadLimit(limit: number): Promise<void> {
-    await api.post('/transfer/setUploadLimit', new URLSearchParams({
+    const params = new URLSearchParams({
       limit: limit.toString()
-    }));
+    });
+    await api.post('/transfer/setUploadLimit', params.toString(), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
   }
 
   async getPreferences(): Promise<Preferences> {

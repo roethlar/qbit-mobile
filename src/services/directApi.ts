@@ -34,18 +34,27 @@ export async function getGlobalStats(): Promise<GlobalTransferInfo | null> {
 }
 
 export async function pauseTorrent(hash: string): Promise<void> {
-  await api.post('/torrents/pause', new URLSearchParams({ hashes: hash }));
+  const params = new URLSearchParams({ hashes: hash });
+  await api.post('/torrents/pause', params.toString(), {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+  });
 }
 
 export async function resumeTorrent(hash: string): Promise<void> {
-  await api.post('/torrents/resume', new URLSearchParams({ hashes: hash }));
+  const params = new URLSearchParams({ hashes: hash });
+  await api.post('/torrents/resume', params.toString(), {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+  });
 }
 
 export async function deleteTorrent(hash: string, deleteFiles = false): Promise<void> {
-  await api.post('/torrents/delete', new URLSearchParams({ 
-    hashes: hash, 
-    deleteFiles: deleteFiles.toString() 
-  }));
+  const params = new URLSearchParams({
+    hashes: hash,
+    deleteFiles: deleteFiles.toString()
+  });
+  await api.post('/torrents/delete', params.toString(), {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+  });
 }
 
 export interface AddTorrentOptions {
