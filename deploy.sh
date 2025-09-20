@@ -378,7 +378,7 @@ if systemctl is-active --quiet "${SERVICE_NAME}"; then
     print_msg "  Restart service: systemctl restart ${SERVICE_NAME}"
     print_msg ""
     print_msg "Access the web interface at:"
-    print_msg "  http://$(hostname -I | awk '{print $1}'):$(grep ^PORT= "${ENV_FILE}" | cut -d= -f2 2>/dev/null || echo "3000")"
+    print_msg "  http://$(ip route get 1.1.1.1 2>/dev/null | awk '{print $7; exit}' || hostname 2>/dev/null || echo "localhost"):$(grep ^PORT= "${ENV_FILE}" | cut -d= -f2 2>/dev/null || echo "3000")"
     print_msg "========================================="
 else
     print_error "Service failed to start. Check logs with: journalctl -u ${SERVICE_NAME} -n 50"
