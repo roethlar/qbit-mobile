@@ -1,0 +1,1 @@
+Before handing off changes run `npm run lint` and `npm run typecheck`. For release-facing work also run `npm run build`. Ensure `.env` or API base expectations remain compatible with the Express proxy (`server/server.js`).

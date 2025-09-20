@@ -1,13 +1,24 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Plus, Settings, RefreshCw, Moon, Sun, Search, X, ArrowUpDown, Tag } from 'lucide-react';
+import { Plus, Settings, RefreshCw, Moon, Sun, Search, X, ArrowUpDown, ArrowUp, ArrowDown, Tag } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { Layout, Header, FloatingActionButton, Card } from '../components/Layout';
 import { CompactTorrentList } from '../components/CompactTorrentList';
+import type { TorrentSortField, TorrentSortOrder } from '../components/CompactTorrentList';
 import { AddTorrent } from '../components/AddTorrent';
 import { useDirectTorrents, useDirectGlobalStats, useDirectTorrentActions } from '../hooks/useDirectTorrents';
 import { formatBytes, formatSpeed } from '../utils/formatters';
 import { getErrorMessage } from '../types/errors';
 import type { AddTorrentOptions } from '../components/AddTorrent';
+
+const SORT_OPTIONS: Array<{ key: TorrentSortField; label: string }> = [
+  { key: 'name', label: 'Name' },
+  { key: 'size', label: 'Size' },
+  { key: 'progress', label: 'Progress' },
+  { key: 'dlspeed', label: 'Download Speed' },
+  { key: 'upspeed', label: 'Upload Speed' },
+  { key: 'added_on', label: 'Date Added' },
+  { key: 'state', label: 'Status' },
+];
 
 interface DashboardProps {
   onLogout: () => void;
@@ -25,7 +36,30 @@ export function Dashboard({ onLogout, onShowSettings }: DashboardProps) {
   const [showSearch, setShowSearch] = useState(false);
   const [showTags, setShowTags] = useState(false);
   const [showSortOptions, setShowSortOptions] = useState(false);
+  const [sortBy, setSortBy] = useState<TorrentSortField>(() => {
+    if (typeof window === 'undefined') return 'name';
+    const stored = localStorage.getItem('qbit-sort-by');
+    if (stored && SORT_OPTIONS.some((option) => option.key === stored)) {
+      return stored as TorrentSortField;
+    }
+    return 'name';
+  });
+  const [sortOrder, setSortOrder] = useState<TorrentSortOrder>(() => {
+    if (typeof window === 'undefined') return 'asc';
+    const stored = localStorage.getItem('qbit-sort-order');
+    return stored === 'desc' ? 'desc' : 'asc';
+  });
   const scrollableRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem('qbit-sort-by', sortBy);
+  }, [sortBy]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem('qbit-sort-order', sortOrder);
+  }, [sortOrder]);
   
   const { toggleTheme, isDark } = useTheme();
   const { data: torrents = [], isLoading, refetch, error } = useDirectTorrents();
@@ -65,6 +99,15 @@ export function Dashboard({ onLogout, onShowSettings }: DashboardProps) {
     await refetch();
     setTimeout(() => setIsPullingToRefresh(false), 300);
   }, [refetch]);
+
+  const handleSortOptionClick = useCallback((option: TorrentSortField) => {
+    if (sortBy === option) {
+      setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(option);
+      setSortOrder('asc');
+    }
+  }, [sortBy]);
 
   const handleAddTorrentUrl = useCallback(async (url: string, options?: AddTorrentOptions) => {
     try {
@@ -217,14 +260,29 @@ export function Dashboard({ onLogout, onShowSettings }: DashboardProps) {
           <div className="px-2 py-1 border-b border-gray-100 dark:border-gray-700">
             <div className="text-xs text-gray-500 mb-1">Sort by:</div>
             <div className="flex flex-wrap gap-1">
-              {['name', 'size', 'progress', 'dlspeed', 'upspeed', 'added_on', 'state'].map((sortOption) => (
-                <button
-                  key={sortOption}
-                  className="px-2 py-0.5 text-xs bg-gray-100 dark:bg-gray-800 rounded"
-                >
-                  {sortOption}
-                </button>
-              ))}
+              {SORT_OPTIONS.map(({ key, label }) => {
+                const isActive = sortBy === key;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => handleSortOptionClick(key)}
+                    className={`flex items-center space-x-1 px-2 py-0.5 text-xs rounded transition-colors ${
+                      isActive
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300'
+                    }`}
+                  >
+                    <span>{label}</span>
+                    {isActive && (
+                      sortOrder === 'asc' ? (
+                        <ArrowUp className="w-3 h-3" />
+                      ) : (
+                        <ArrowDown className="w-3 h-3" />
+                      )
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
@@ -254,6 +312,8 @@ export function Dashboard({ onLogout, onShowSettings }: DashboardProps) {
         <CompactTorrentList
           torrents={filteredTorrents}
           searchQuery={searchQuery}
+          sortBy={sortBy}
+          sortOrder={sortOrder}
           onPause={(hash) => pauseTorrent.mutate(hash)}
           onResume={(hash) => resumeTorrent.mutate(hash)}
           onDelete={(hash, deleteFiles) => deleteTorrent.mutate({ hash, deleteFiles })}

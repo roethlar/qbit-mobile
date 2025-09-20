@@ -1,33 +1,30 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Play, Pause, Trash2, MoreVertical, ArrowUp, ArrowDown } from 'lucide-react';
+import { Play, Pause, Trash2, MoreVertical } from 'lucide-react';
 import type { Torrent } from '../types/qbittorrent';
 import { formatBytes, formatSpeed, formatProgress, getStateColor, getStateText } from '../utils/formatters';
 import { BottomSheet } from './Layout';
 import { clsx } from 'clsx';
 
+export type TorrentSortField = 'name' | 'size' | 'progress' | 'dlspeed' | 'upspeed' | 'added_on' | 'state';
+export type TorrentSortOrder = 'asc' | 'desc';
+
 interface CompactTorrentListProps {
   torrents: Torrent[];
   searchQuery?: string;
+  sortBy: TorrentSortField;
+  sortOrder: TorrentSortOrder;
   onPause: (hash: string) => void;
   onResume: (hash: string) => void;
   onDelete: (hash: string, deleteFiles?: boolean) => void;
   onTorrentClick?: (torrent: Torrent) => void;
 }
 
-export function CompactTorrentList({ torrents, searchQuery = '', onPause, onResume, onDelete, onTorrentClick }: CompactTorrentListProps) {
+export function CompactTorrentList({ torrents, searchQuery = '', sortBy, sortOrder, onPause, onResume, onDelete, onTorrentClick }: CompactTorrentListProps) {
   const [selectedTorrent, setSelectedTorrent] = useState<Torrent | null>(null);
   const [showActions, setShowActions] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [sortBy, setSortBy] = useState<'name' | 'size' | 'progress' | 'dlspeed' | 'upspeed' | 'added_on' | 'state'>(() => {
-    const saved = localStorage.getItem('qbit-sort-by');
-    return (saved as 'name' | 'size' | 'progress' | 'dlspeed' | 'upspeed' | 'added_on' | 'state') || 'name';
-  });
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(() => {
-    const saved = localStorage.getItem('qbit-sort-order');
-    return (saved as 'asc' | 'desc') || 'asc';
-  });
-  const [selectedTag, setSelectedTag] = useState<string>(() => {
+  const [selectedTag] = useState<string>(() => {
     return localStorage.getItem('qbit-selected-tag') || '';
   });
   const itemsPerPage = 5000; // Show all torrents to save space
@@ -127,28 +124,15 @@ export function CompactTorrentList({ torrents, searchQuery = '', onPause, onResu
 
   const totalPages = Math.ceil(filteredAndSortedTorrents.length / itemsPerPage);
 
-  // Save preferences to localStorage
   useEffect(() => {
-    localStorage.setItem('qbit-sort-by', sortBy);
-  }, [sortBy]);
+    setCurrentPage(1);
+  }, [sortBy, sortOrder]);
 
-  useEffect(() => {
-    localStorage.setItem('qbit-sort-order', sortOrder);
-  }, [sortOrder]);
-
+  // Persist selected tag for future sessions
   useEffect(() => {
     localStorage.setItem('qbit-selected-tag', selectedTag);
   }, [selectedTag]);
 
-  const handleSort = (newSortBy: typeof sortBy) => {
-    if (sortBy === newSortBy) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(newSortBy);
-      setSortOrder('asc');
-    }
-    setCurrentPage(1);
-  };
 
   const handleTorrentClick = (torrent: Torrent) => {
     if (onTorrentClick) {

@@ -8,7 +8,7 @@ A modern, responsive web interface for qBittorrent optimized for mobile devices.
 <summary>View Screenshots</summary>
 
 ### Mobile View (iOS)
-![qBit Mobile on iOS](qBit_Mobile_ios.jpg)
+![qBit Mobile on iOS](qBit_Mobile_iPhone.jpeg)
 
 ### Desktop View
 ![qBit Mobile on Desktop](qBit_Mobile_PC.png)
