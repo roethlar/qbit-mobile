@@ -106,6 +106,12 @@ print_msg "Copied essential files for build and runtime"
 # Navigate to app directory
 cd "${APP_DIR}"
 
+# Clean up old node_modules to avoid conflicts
+if [ -d "node_modules" ]; then
+    print_msg "Removing old node_modules..."
+    rm -rf node_modules
+fi
+
 # Install all dependencies (including dev for build)
 print_msg "Installing dependencies..."
 # Use npm install instead of npm ci to handle lock file sync issues
