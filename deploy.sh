@@ -86,7 +86,8 @@ print_msg "Copying application files..."
 # Copy runtime files
 cp -r server/ "${APP_DIR}/"
 cp package.json "${APP_DIR}/"
-cp package-lock.json "${APP_DIR}/"
+# Only copy package-lock.json if it exists
+[ -f package-lock.json ] && cp package-lock.json "${APP_DIR}/"
 cp .env.example "${APP_DIR}/"
 
 # Copy source files needed for build
@@ -107,7 +108,9 @@ cd "${APP_DIR}"
 
 # Install all dependencies (including dev for build)
 print_msg "Installing dependencies..."
-npm ci || npm install
+# Use npm install instead of npm ci to handle lock file sync issues
+# npm install will update the lock file if needed
+npm install
 
 # Build the frontend
 print_msg "Building frontend..."
