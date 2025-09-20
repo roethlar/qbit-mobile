@@ -204,13 +204,6 @@ export function CompactTorrentList({ torrents, searchQuery = '', onPause, onResu
 
   return (
     <div className="flex-1 flex flex-col">
-      {/* Simple counter header */}
-      <div className="bg-white dark:bg-gray-850 border-b border-gray-100 dark:border-gray-700 px-2 py-1">
-        <span className="text-xs text-gray-500">
-          {searchQuery && `Found ${filteredAndSortedTorrents.length} of `}{torrents.length} torrents
-        </span>
-      </div>
-
       {/* Compact Torrent List */}
       <div className="flex-1 overflow-auto">
         {paginatedTorrents.map((torrent, index) => (
