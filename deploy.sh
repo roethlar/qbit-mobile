@@ -37,6 +37,46 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
+# Welcome message
+echo ""
+echo "========================================="
+echo "     qBit Mobile Deployment Script"
+echo "========================================="
+echo ""
+
+# Check if this is an update or fresh install first (just for display)
+if [ -f "${SERVICE_FILE}" ]; then
+    echo -e "${YELLOW}[*]${NC} Existing installation detected at ${APP_DIR}"
+    if systemctl is-active --quiet "${SERVICE_NAME}"; then
+        echo -e "${YELLOW}[!]${NC} Service '${SERVICE_NAME}' is currently running"
+    fi
+    echo ""
+    echo "This script will:"
+    echo "  • Stop the existing ${SERVICE_NAME} service"
+    echo "  • Remove old files from ${APP_DIR}"
+    echo "  • Deploy the latest build"
+    echo "  • Restart the service"
+else
+    echo -e "${GREEN}[i]${NC} No existing installation found"
+    echo ""
+    echo "This script will:"
+    echo "  • Create a new installation at ${APP_DIR}"
+    echo "  • Build and deploy the application"
+    echo "  • Create and start a systemd service"
+fi
+
+echo ""
+echo -e "${YELLOW}WARNING:${NC} This will overwrite any files in ${APP_DIR}"
+echo ""
+read -p "Do you want to proceed? (y/N): " -n 1 -r
+echo ""
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    print_warning "Deployment cancelled"
+    exit 0
+fi
+
+echo ""
+
 # Check prerequisites
 print_msg "Checking prerequisites..."
 
