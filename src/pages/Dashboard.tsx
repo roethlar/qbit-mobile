@@ -169,70 +169,74 @@ export function Dashboard({ onLogout, onShowSettings }: DashboardProps) {
         }
       />
 
-      <div className="px-2 py-0.5 bg-white dark:bg-gray-850 border-b border-gray-100 dark:border-gray-700">
-        <div className="flex items-center justify-between">
-          <div className="flex overflow-x-auto space-x-1 flex-1">
-          {filters.map((filterItem) => (
-            <button
-              key={filterItem.key}
-              onClick={() => setFilter(filterItem.key)}
-              className={`flex-shrink-0 px-1.5 py-0.5 rounded text-xs transition-colors ${
-                filter === filterItem.key
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-gray-100 text-gray-600 active:bg-gray-200'
-              }`}
-            >
-              {filterItem.label} ({filterItem.count})
-            </button>
-          ))}
-          </div>
-          {globalStats && (
-            <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400 ml-2">
-              <span>↓<span className="font-medium text-blue-600">{formatSpeed(globalStats.dl_info_speed)}</span></span>
-              <span>↑<span className="font-medium text-green-600">{formatSpeed(globalStats.up_info_speed)}</span></span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Search Bar */}
-      {showSearch && (
-        <div className="px-2 py-1 bg-white dark:bg-gray-850 border-b border-gray-100 dark:border-gray-700">
-          <input
-            type="text"
-            placeholder="Search torrents..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full px-2 py-1 text-sm bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-1 focus:ring-primary-500"
-            autoFocus
-          />
-        </div>
-      )}
-
-      {/* Sort Options */}
-      {showSortOptions && (
-        <div className="px-2 py-1 bg-white dark:bg-gray-850 border-b border-gray-100 dark:border-gray-700">
-          <div className="text-xs text-gray-500 mb-1">Sort by:</div>
-          <div className="flex flex-wrap gap-1">
-            {['name', 'size', 'progress', 'dlspeed', 'upspeed', 'added_on', 'state'].map((sortOption) => (
+      {/* Fixed Controls Section */}
+      <div className="sticky top-[33px] z-10 bg-white dark:bg-gray-850">
+        {/* Filter buttons bar */}
+        <div className="px-2 py-0.5 border-b border-gray-100 dark:border-gray-700">
+          <div className="flex items-center justify-between">
+            <div className="flex overflow-x-auto space-x-1 flex-1">
+            {filters.map((filterItem) => (
               <button
-                key={sortOption}
-                className="px-2 py-0.5 text-xs bg-gray-100 dark:bg-gray-800 rounded"
+                key={filterItem.key}
+                onClick={() => setFilter(filterItem.key)}
+                className={`flex-shrink-0 px-1.5 py-0.5 rounded text-xs transition-colors ${
+                  filter === filterItem.key
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-gray-100 text-gray-600 active:bg-gray-200'
+                }`}
               >
-                {sortOption}
+                {filterItem.label} ({filterItem.count})
               </button>
             ))}
+            </div>
+            {globalStats && (
+              <div className="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400 ml-2">
+                <span>↓<span className="font-medium text-blue-600">{formatSpeed(globalStats.dl_info_speed)}</span></span>
+                <span>↑<span className="font-medium text-green-600">{formatSpeed(globalStats.up_info_speed)}</span></span>
+              </div>
+            )}
           </div>
         </div>
-      )}
 
-      {/* Tags Filter */}
-      {showTags && (
-        <div className="px-2 py-1 bg-white dark:bg-gray-850 border-b border-gray-100 dark:border-gray-700">
-          <div className="text-xs text-gray-500 mb-1">Filter by tag:</div>
-          <div className="text-xs text-gray-600">No tags available</div>
-        </div>
-      )}
+        {/* Search Bar */}
+        {showSearch && (
+          <div className="px-2 py-1 border-b border-gray-100 dark:border-gray-700">
+            <input
+              type="text"
+              placeholder="Search torrents..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full px-2 py-1 text-sm bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-1 focus:ring-primary-500"
+              autoFocus
+            />
+          </div>
+        )}
+
+        {/* Sort Options */}
+        {showSortOptions && (
+          <div className="px-2 py-1 border-b border-gray-100 dark:border-gray-700">
+            <div className="text-xs text-gray-500 mb-1">Sort by:</div>
+            <div className="flex flex-wrap gap-1">
+              {['name', 'size', 'progress', 'dlspeed', 'upspeed', 'added_on', 'state'].map((sortOption) => (
+                <button
+                  key={sortOption}
+                  className="px-2 py-0.5 text-xs bg-gray-100 dark:bg-gray-800 rounded"
+                >
+                  {sortOption}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Tags Filter */}
+        {showTags && (
+          <div className="px-2 py-1 border-b border-gray-100 dark:border-gray-700">
+            <div className="text-xs text-gray-500 mb-1">Filter by tag:</div>
+            <div className="text-xs text-gray-600">No tags available</div>
+          </div>
+        )}
+      </div>
 
       {addError && (
         <div className="mx-4 mb-4 p-3 bg-red-50 border border-red-200 rounded-xl">
