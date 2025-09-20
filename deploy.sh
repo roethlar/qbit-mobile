@@ -56,6 +56,26 @@ if ! command -v npm &> /dev/null; then
     exit 1
 fi
 
+# Check if this is an update or fresh install
+IS_UPDATE=false
+if [ -f "${SERVICE_FILE}" ]; then
+    IS_UPDATE=true
+    print_msg "Existing installation detected - performing update"
+
+    # Stop existing service before deployment
+    if systemctl is-active --quiet "${SERVICE_NAME}"; then
+        print_msg "Stopping existing service before deployment..."
+        systemctl stop "${SERVICE_NAME}"
+    fi
+
+    # Extract existing service user from service file
+    SERVICE_USER=$(grep "^User=" "${SERVICE_FILE}" | cut -d= -f2)
+    SERVICE_GROUP=$(grep "^Group=" "${SERVICE_FILE}" | cut -d= -f2)
+    print_msg "Using existing service user: ${SERVICE_USER}"
+else
+    print_msg "Fresh installation detected"
+fi
+
 # Create application directory
 print_msg "Creating application directory at ${APP_DIR}..."
 mkdir -p "${APP_DIR}"
@@ -97,44 +117,46 @@ npm run build
 print_msg "Cleaning up dev dependencies..."
 npm ci --production || npm install --production
 
-# Service user configuration
-print_msg "Service user configuration:"
-echo "1) nobody (minimal permissions, recommended for local use)"
-echo "2) custom user (creates dedicated user account)"
-while true; do
-    read -r -p "Choose service user type [1]: " user_choice
-    case ${user_choice:-1} in
-        1)
-            SERVICE_USER="nobody"
-            SERVICE_GROUP="nobody"
-            print_msg "Using nobody user (minimal permissions)"
-            break
-            ;;
-        2)
-            SERVICE_USER="qbitmobile"
-            SERVICE_GROUP="${SERVICE_USER}"
-            print_msg "Using custom user: ${SERVICE_USER}"
-            
-            # Ensure service user/group exist
-            print_msg "Creating service user..."
-            NOLOGIN_BIN=$(command -v nologin || command -v /usr/sbin/nologin || echo "/usr/sbin/nologin")
-            if ! getent group "${SERVICE_GROUP}" >/dev/null 2>&1; then
-                if ! groupadd --system "${SERVICE_GROUP}" 2>/dev/null; then
-                    groupadd "${SERVICE_GROUP}"
+# Service user configuration (only for fresh installs)
+if [ "$IS_UPDATE" = false ]; then
+    print_msg "Service user configuration:"
+    echo "1) nobody (minimal permissions, recommended for local use)"
+    echo "2) custom user (creates dedicated user account)"
+    while true; do
+        read -r -p "Choose service user type [1]: " user_choice
+        case ${user_choice:-1} in
+            1)
+                SERVICE_USER="nobody"
+                SERVICE_GROUP="nobody"
+                print_msg "Using nobody user (minimal permissions)"
+                break
+                ;;
+            2)
+                SERVICE_USER="qbitmobile"
+                SERVICE_GROUP="${SERVICE_USER}"
+                print_msg "Using custom user: ${SERVICE_USER}"
+
+                # Ensure service user/group exist
+                print_msg "Creating service user..."
+                NOLOGIN_BIN=$(command -v nologin || command -v /usr/sbin/nologin || echo "/usr/sbin/nologin")
+                if ! getent group "${SERVICE_GROUP}" >/dev/null 2>&1; then
+                    if ! groupadd --system "${SERVICE_GROUP}" 2>/dev/null; then
+                        groupadd "${SERVICE_GROUP}"
+                    fi
                 fi
-            fi
-            if ! id -u "${SERVICE_USER}" >/dev/null 2>&1; then
-                if ! useradd --system --no-create-home --home-dir "${APP_DIR}" --shell "${NOLOGIN_BIN}" --gid "${SERVICE_GROUP}" "${SERVICE_USER}" 2>/dev/null; then
-                    useradd -M -d "${APP_DIR}" -s "${NOLOGIN_BIN}" -g "${SERVICE_GROUP}" "${SERVICE_USER}"
+                if ! id -u "${SERVICE_USER}" >/dev/null 2>&1; then
+                    if ! useradd --system --no-create-home --home-dir "${APP_DIR}" --shell "${NOLOGIN_BIN}" --gid "${SERVICE_GROUP}" "${SERVICE_USER}" 2>/dev/null; then
+                        useradd -M -d "${APP_DIR}" -s "${NOLOGIN_BIN}" -g "${SERVICE_GROUP}" "${SERVICE_USER}"
+                    fi
                 fi
-            fi
-            break
-            ;;
-        *)
-            print_warning "Invalid choice. Enter 1 or 2."
-            ;;
-    esac
-done
+                break
+                ;;
+            *)
+                print_warning "Invalid choice. Enter 1 or 2."
+                ;;
+        esac
+    done
+fi
 
 # Interactive environment setup for novice users
 print_msg "Setting up environment (.env)"
@@ -188,10 +210,16 @@ EOF
 }
 
 if [ -f "${ENV_FILE}" ]; then
-    if confirm_overwrite_env; then
-        overwrite_env=true
-    else
+    if [ "$IS_UPDATE" = true ]; then
+        # For updates, default to keeping existing env
+        print_msg "Keeping existing .env configuration (use --force-env to override)"
         overwrite_env=false
+    else
+        if confirm_overwrite_env; then
+            overwrite_env=true
+        else
+            overwrite_env=false
+        fi
     fi
 else
     overwrite_env=true
@@ -270,9 +298,10 @@ else
 fi
 
 
-# Create systemd service
-print_msg "Creating systemd service..."
-cat > "${SERVICE_FILE}" << EOF
+# Create systemd service (only if it doesn't exist or we're updating)
+if [ "$IS_UPDATE" = false ] || [ ! -f "${SERVICE_FILE}" ]; then
+    print_msg "Creating systemd service..."
+    cat > "${SERVICE_FILE}" << EOF
 [Unit]
 Description=qBit Mobile - qBittorrent Web Interface
 After=network.target
@@ -303,19 +332,16 @@ SyslogIdentifier=${SERVICE_NAME}
 [Install]
 WantedBy=multi-user.target
 EOF
+else
+    print_msg "Keeping existing systemd service configuration"
+fi
 
 # Reload systemd and enable service
 print_msg "Configuring systemd service..."
 systemctl daemon-reload
 systemctl enable "${SERVICE_NAME}.service"
 
-# Stop existing service if running
-if systemctl is-active --quiet "${SERVICE_NAME}"; then
-    print_msg "Stopping existing service..."
-    systemctl stop "${SERVICE_NAME}"
-fi
-
-# Start the service
+# Start the service (already stopped earlier if it was running)
 print_msg "Starting ${SERVICE_NAME} service..."
 systemctl start "${SERVICE_NAME}"
 
@@ -325,7 +351,11 @@ if systemctl is-active --quiet "${SERVICE_NAME}"; then
     print_msg "Service started successfully!"
     print_msg ""
     print_msg "========================================="
-    print_msg "qBit Mobile has been deployed successfully!"
+    if [ "$IS_UPDATE" = true ]; then
+        print_msg "qBit Mobile has been updated successfully!"
+    else
+        print_msg "qBit Mobile has been deployed successfully!"
+    fi
     print_msg ""
     print_msg "Configuration:"
     print_msg "  Service user: ${SERVICE_USER}"

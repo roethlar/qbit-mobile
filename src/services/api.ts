@@ -275,13 +275,18 @@ export class QBittorrentAPI {
   }
 
   async getPreferences(): Promise<Preferences> {
+    await this.ensureInitialized(); // Ensure we're authenticated first
     const response = await api.get('/app/preferences');
     return response.data;
   }
 
   async setPreferences(prefs: Partial<Preferences>): Promise<void> {
-    await api.post('/app/setPreferences', {
+    await this.ensureInitialized(); // Ensure we're authenticated first
+    const params = new URLSearchParams({
       json: JSON.stringify(prefs)
+    });
+    await api.post('/app/setPreferences', params.toString(), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
     });
   }
 

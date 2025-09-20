@@ -14,6 +14,7 @@ export function Settings({ onBack }: SettingsProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     loadPreferences();
@@ -22,10 +23,12 @@ export function Settings({ onBack }: SettingsProps) {
   const loadPreferences = async () => {
     try {
       setLoading(true);
+      setLoadError(null);
       const prefs = await qbApi.getPreferences();
       setPreferences(prefs);
     } catch (error) {
       // Failed to load preferences
+      setLoadError('Failed to load qBittorrent preferences. Make sure qBittorrent is running and accessible.');
     } finally {
       setLoading(false);
     }
@@ -91,9 +94,12 @@ export function Settings({ onBack }: SettingsProps) {
             </button>
           }
         />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <p className="text-red-600 mb-4">Failed to load settings</p>
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="text-center max-w-sm">
+            <p className="text-red-600 mb-2 font-medium">Failed to load settings</p>
+            {loadError && (
+              <p className="text-gray-600 text-sm mb-4">{loadError}</p>
+            )}
             <button onClick={loadPreferences} className="ios-button">
               Retry
             </button>

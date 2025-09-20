@@ -165,15 +165,15 @@ app.post('/api/v2/torrents/add', upload.any(), async (req, res) => {
 app.use('/api/v2', async (req, res) => {
   const path = req.url;
   // Proxying API request
-  
+
   try {
     let data = req.body;
     let headers = {};
-    
+
     // Handle different content types
     if (req.is('application/x-www-form-urlencoded')) {
       headers['Content-Type'] = 'application/x-www-form-urlencoded';
-      if (typeof data === 'object') {
+      if (typeof data === 'object' && data !== null) {
         data = new URLSearchParams(data).toString();
       }
     } else if (req.is('multipart/form-data')) {
