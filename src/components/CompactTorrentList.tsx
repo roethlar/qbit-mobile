@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Play, Pause, Trash2, MoreVertical, Search, X, ArrowUpDown, ArrowUp, ArrowDown, Tag } from 'lucide-react';
+import { Play, Pause, Trash2, MoreVertical, ArrowUp, ArrowDown } from 'lucide-react';
 import type { Torrent } from '../types/qbittorrent';
 import { formatBytes, formatSpeed, formatProgress, getStateColor, getStateText } from '../utils/formatters';
 import { BottomSheet } from './Layout';
@@ -7,19 +7,17 @@ import { clsx } from 'clsx';
 
 interface CompactTorrentListProps {
   torrents: Torrent[];
+  searchQuery?: string;
   onPause: (hash: string) => void;
   onResume: (hash: string) => void;
   onDelete: (hash: string, deleteFiles?: boolean) => void;
   onTorrentClick?: (torrent: Torrent) => void;
 }
 
-export function CompactTorrentList({ torrents, onPause, onResume, onDelete, onTorrentClick }: CompactTorrentListProps) {
+export function CompactTorrentList({ torrents, searchQuery = '', onPause, onResume, onDelete, onTorrentClick }: CompactTorrentListProps) {
   const [selectedTorrent, setSelectedTorrent] = useState<Torrent | null>(null);
   const [showActions, setShowActions] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showSearch, setShowSearch] = useState(false);
-  const [showTags, setShowTags] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortBy, setSortBy] = useState<'name' | 'size' | 'progress' | 'dlspeed' | 'upspeed' | 'added_on' | 'state'>(() => {
     const saved = localStorage.getItem('qbit-sort-by');
@@ -32,7 +30,6 @@ export function CompactTorrentList({ torrents, onPause, onResume, onDelete, onTo
   const [selectedTag, setSelectedTag] = useState<string>(() => {
     return localStorage.getItem('qbit-selected-tag') || '';
   });
-  const [showSortOptions, setShowSortOptions] = useState(false);
   const itemsPerPage = 5000; // Show all torrents to save space
 
   // Get unique tags from torrents
@@ -207,139 +204,11 @@ export function CompactTorrentList({ torrents, onPause, onResume, onDelete, onTo
 
   return (
     <div className="flex-1 flex flex-col">
-      {/* Search Header - More compact */}
+      {/* Simple counter header */}
       <div className="bg-white dark:bg-gray-850 border-b border-gray-100 dark:border-gray-700 px-2 py-1">
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-gray-500">
-            {filteredAndSortedTorrents.length}/{torrents.length}
-          </span>
-          <div className="flex items-center">
-            {availableTags.length > 0 && (
-              <button
-                onClick={() => setShowTags(!showTags)}
-                className="p-1 text-gray-500 hover:text-gray-700 rounded active:bg-gray-100 relative"
-              >
-                <Tag className="w-4 h-4" />
-                {selectedTag && (
-                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary-600 rounded-full"></span>
-                )}
-              </button>
-            )}
-            <button
-              onClick={() => setShowSortOptions(!showSortOptions)}
-              className="p-1 text-gray-500 hover:text-gray-700 rounded active:bg-gray-100"
-            >
-              <ArrowUpDown className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setShowSearch(!showSearch)}
-              className="p-1 text-gray-500 hover:text-gray-700 rounded active:bg-gray-100"
-            >
-              {showSearch ? <X className="w-4 h-4" /> : <Search className="w-4 h-4" />}
-            </button>
-          </div>
-        </div>
-
-        {/* Sort Options - Compact */}
-        {showSortOptions && (
-          <div className="mt-1 p-1 bg-gray-50 dark:bg-gray-800 rounded">
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              {[
-                { key: 'name' as const, label: 'Name' },
-                { key: 'size' as const, label: 'Size' },
-                { key: 'progress' as const, label: 'Progress' },
-                { key: 'dlspeed' as const, label: 'DL Speed' },
-                { key: 'upspeed' as const, label: 'UL Speed' },
-                { key: 'added_on' as const, label: 'Date Added' },
-                { key: 'state' as const, label: 'Status' }
-              ].map((option) => (
-                <button
-                  key={option.key}
-                  onClick={() => handleSort(option.key)}
-                  className={clsx(
-                    'flex items-center justify-between p-2 rounded-lg transition-colors',
-                    sortBy === option.key
-                      ? 'bg-primary-600 text-white'
-                      : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 active:bg-gray-100 dark:active:bg-gray-600'
-                  )}
-                >
-                  <span>{option.label}</span>
-                  {sortBy === option.key && (
-                    sortOrder === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Tag Filter - Popup */}
-        {showTags && availableTags.length > 0 && (
-          <div className="mt-1 p-2 bg-gray-50 dark:bg-gray-800 rounded">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-medium text-gray-600">Tags</span>
-              {selectedTag && (
-                <button
-                  onClick={() => {
-                    setSelectedTag('');
-                    setCurrentPage(1);
-                  }}
-                  className="text-xs text-primary-600 hover:text-primary-800"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-1">
-              {availableTags.map((tag) => (
-                <button
-                  key={tag}
-                  onClick={() => {
-                    setSelectedTag(selectedTag === tag ? '' : tag);
-                    setCurrentPage(1);
-                    setShowTags(false);
-                  }}
-                  className={clsx(
-                    'px-1.5 py-0.5 rounded text-xs transition-colors',
-                    selectedTag === tag
-                      ? 'bg-primary-600 text-white'
-                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 active:bg-gray-300 dark:active:bg-gray-600'
-                  )}
-                >
-                  {tag}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-        
-        {showSearch && (
-          <div className="relative mt-1">
-            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-3 h-3" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setCurrentPage(1); // Reset to first page when searching
-              }}
-              placeholder="Search..."
-              className="w-full pl-7 pr-2 py-1 border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded text-xs focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-transparent"
-              autoFocus
-            />
-            {searchQuery && (
-              <button
-                onClick={() => {
-                  setSearchQuery('');
-                  setCurrentPage(1);
-                }}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-        )}
+        <span className="text-xs text-gray-500">
+          {searchQuery && `Found ${filteredAndSortedTorrents.length} of `}{torrents.length} torrents
+        </span>
       </div>
 
       {/* Compact Torrent List */}

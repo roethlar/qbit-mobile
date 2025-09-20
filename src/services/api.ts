@@ -128,6 +128,7 @@ export class QBittorrentAPI {
   }
 
   async getVersion(): Promise<string> {
+    await this.ensureInitialized(); // Ensure we're authenticated first
     const response = await api.get('/app/version');
     return response.data;
   }
@@ -179,6 +180,7 @@ export class QBittorrentAPI {
   }
 
   async getTorrentInfo(hash: string): Promise<TorrentInfo> {
+    await this.ensureInitialized(); // Ensure we're authenticated first
     const response = await api.get('/torrents/properties', {
       params: { hash }
     });
@@ -186,6 +188,7 @@ export class QBittorrentAPI {
   }
 
   async pauseTorrent(hash: string): Promise<void> {
+    await this.ensureInitialized(); // Ensure we're authenticated first
     const params = new URLSearchParams({ hashes: hash });
     await api.post('/torrents/pause', params.toString(), {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
@@ -193,6 +196,7 @@ export class QBittorrentAPI {
   }
 
   async resumeTorrent(hash: string): Promise<void> {
+    await this.ensureInitialized(); // Ensure we're authenticated first
     const params = new URLSearchParams({ hashes: hash });
     await api.post('/torrents/resume', params.toString(), {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
@@ -200,6 +204,7 @@ export class QBittorrentAPI {
   }
 
   async deleteTorrent(hash: string, deleteFiles = false): Promise<void> {
+    await this.ensureInitialized(); // Ensure we're authenticated first
     const params = new URLSearchParams({
       hashes: hash,
       deleteFiles: deleteFiles.toString()
@@ -226,6 +231,7 @@ export class QBittorrentAPI {
     sequentialDownload?: boolean;
     firstLastPiecePrio?: boolean;
   }): Promise<void> {
+    await this.ensureInitialized(); // Ensure we're authenticated first
     const formData = new FormData();
     
     if (typeof torrentData === 'string') {
@@ -250,6 +256,7 @@ export class QBittorrentAPI {
   }
 
   async setTorrentPriority(hash: string, priority: 'increase' | 'decrease' | 'maxPrio' | 'minPrio'): Promise<void> {
+    await this.ensureInitialized(); // Ensure we're authenticated first
     const params = new URLSearchParams({ hashes: hash });
     await api.post(`/torrents/${priority}Prio`, params.toString(), {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
@@ -257,6 +264,7 @@ export class QBittorrentAPI {
   }
 
   async setGlobalDownloadLimit(limit: number): Promise<void> {
+    await this.ensureInitialized(); // Ensure we're authenticated first
     const params = new URLSearchParams({
       limit: limit.toString()
     });
@@ -266,6 +274,7 @@ export class QBittorrentAPI {
   }
 
   async setGlobalUploadLimit(limit: number): Promise<void> {
+    await this.ensureInitialized(); // Ensure we're authenticated first
     const params = new URLSearchParams({
       limit: limit.toString()
     });

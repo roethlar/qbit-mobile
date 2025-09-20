@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Plus, Settings, RefreshCw, Moon, Sun } from 'lucide-react';
+import { Plus, Settings, RefreshCw, Moon, Sun, Search, X, ArrowUpDown, Tag } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { Layout, Header, FloatingActionButton, Card } from '../components/Layout';
 import { CompactTorrentList } from '../components/CompactTorrentList';
@@ -21,6 +21,10 @@ export function Dashboard({ onLogout, onShowSettings }: DashboardProps) {
   const [addError, setAddError] = useState<string | null>(null);
   const [addSuccess, setAddSuccess] = useState<string | null>(null);
   const [isPullingToRefresh, setIsPullingToRefresh] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
+  const [showTags, setShowTags] = useState(false);
+  const [showSortOptions, setShowSortOptions] = useState(false);
   const scrollableRef = useRef<HTMLDivElement>(null);
   
   const { toggleTheme, isDark } = useTheme();
@@ -120,6 +124,27 @@ export function Dashboard({ onLogout, onShowSettings }: DashboardProps) {
         rightButton={
           <div className="flex items-center space-x-1">
             <button
+              onClick={() => setShowSearch(!showSearch)}
+              className="p-1 text-gray-600 hover:text-gray-900 active:bg-gray-100 dark:text-gray-300 dark:hover:text-gray-100 dark:active:bg-gray-700 rounded transition-colors"
+              title="Search"
+            >
+              {showSearch ? <X className="w-4 h-4" /> : <Search className="w-4 h-4" />}
+            </button>
+            <button
+              onClick={() => setShowTags(!showTags)}
+              className="p-1 text-gray-600 hover:text-gray-900 active:bg-gray-100 dark:text-gray-300 dark:hover:text-gray-100 dark:active:bg-gray-700 rounded transition-colors"
+              title="Filter by tag"
+            >
+              <Tag className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setShowSortOptions(!showSortOptions)}
+              className="p-1 text-gray-600 hover:text-gray-900 active:bg-gray-100 dark:text-gray-300 dark:hover:text-gray-100 dark:active:bg-gray-700 rounded transition-colors"
+              title="Sort options"
+            >
+              <ArrowUpDown className="w-4 h-4" />
+            </button>
+            <button
               onClick={onShowSettings}
               className="p-1 text-gray-600 hover:text-gray-900 active:bg-gray-100 dark:text-gray-300 dark:hover:text-gray-100 dark:active:bg-gray-700 rounded transition-colors"
               title="Settings"
@@ -170,6 +195,45 @@ export function Dashboard({ onLogout, onShowSettings }: DashboardProps) {
         </div>
       </div>
 
+      {/* Search Bar */}
+      {showSearch && (
+        <div className="px-2 py-1 bg-white dark:bg-gray-850 border-b border-gray-100 dark:border-gray-700">
+          <input
+            type="text"
+            placeholder="Search torrents..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full px-2 py-1 text-sm bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-1 focus:ring-primary-500"
+            autoFocus
+          />
+        </div>
+      )}
+
+      {/* Sort Options */}
+      {showSortOptions && (
+        <div className="px-2 py-1 bg-white dark:bg-gray-850 border-b border-gray-100 dark:border-gray-700">
+          <div className="text-xs text-gray-500 mb-1">Sort by:</div>
+          <div className="flex flex-wrap gap-1">
+            {['name', 'size', 'progress', 'dlspeed', 'upspeed', 'added_on', 'state'].map((sortOption) => (
+              <button
+                key={sortOption}
+                className="px-2 py-0.5 text-xs bg-gray-100 dark:bg-gray-800 rounded"
+              >
+                {sortOption}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Tags Filter */}
+      {showTags && (
+        <div className="px-2 py-1 bg-white dark:bg-gray-850 border-b border-gray-100 dark:border-gray-700">
+          <div className="text-xs text-gray-500 mb-1">Filter by tag:</div>
+          <div className="text-xs text-gray-600">No tags available</div>
+        </div>
+      )}
+
       {addError && (
         <div className="mx-4 mb-4 p-3 bg-red-50 border border-red-200 rounded-xl">
           <p className="text-red-800 text-sm font-medium">{addError}</p>
@@ -185,6 +249,7 @@ export function Dashboard({ onLogout, onShowSettings }: DashboardProps) {
       <div className="flex-1">
         <CompactTorrentList
           torrents={filteredTorrents}
+          searchQuery={searchQuery}
           onPause={(hash) => pauseTorrent.mutate(hash)}
           onResume={(hash) => resumeTorrent.mutate(hash)}
           onDelete={(hash, deleteFiles) => deleteTorrent.mutate({ hash, deleteFiles })}
