@@ -1,16 +1,27 @@
 # qBit Mobile
 
-A modern, responsive web interface for qBittorrent optimized for mobile devices.
+A modern, responsive web interface for qBittorrent optimized for mobile devices. Designed as a lightweight alternative to the default WebUI with a focus on mobile usability and touch-friendly controls.
+
+## Screenshots
+
+<details>
+<summary>View Screenshots</summary>
+
+*Screenshots coming soon - contributions welcome!*
+
+</details>
 
 ## Features
 
-- 📱 Mobile-first responsive design
-- ⚡ Fast and lightweight
-- 🌙 Dark mode support
-- 🔍 Search and filter torrents
-- 🏷️ Tag-based filtering
-- 📊 Real-time statistics
-- 🔄 Auto-refresh every 5 seconds
+- 📱 **Mobile-first design** - Optimized for iOS and Android browsers
+- ⚡ **Fast and lightweight** - Minimal resource usage, instant interactions
+- 🌙 **Dark mode support** - Automatic theme switching with manual override
+- 🔍 **Search and filter** - Real-time torrent search and status filtering
+- 🏷️ **Tag-based organization** - Filter torrents by tags
+- 📊 **Real-time statistics** - Live download/upload speeds and progress
+- 🔄 **Auto-refresh** - Automatic updates every 5 seconds
+- 🎯 **Touch-optimized** - Swipe actions and touch-friendly controls
+- 🔐 **Secure** - Supports authentication and local bypass
 
 ## Requirements
 
@@ -27,7 +38,7 @@ A modern, responsive web interface for qBittorrent optimized for mobile devices.
 git clone https://github.com/yourusername/qbit-mobile.git
 cd qbit-mobile
 
-# Run the deployment script as root
+# Run the interactive deployment script as root
 sudo ./deploy.sh
 ```
 
@@ -39,10 +50,12 @@ sudo ./uninstall.sh
 ```
 
 The deployment script will:
-- Install dependencies and build the frontend
-- Interactively collect settings and write `.env`
-- Create a dedicated system user `qbitmobile` for the service
-- Create and start a systemd service `qbit-mobile`
+- Detect existing installations and perform updates gracefully
+- Install dependencies and build the production bundle
+- Interactively configure qBittorrent connection settings
+- Create a dedicated system user for security (fresh installs)
+- Set up and manage the systemd service
+- Preserve existing configurations during updates
 
 ### Manual Installation
 
@@ -145,7 +158,16 @@ MIT
 
 Pull requests are welcome! Please feel free to submit a PR.
 
-## Issues
+## Troubleshooting
+
+### Common Issues
+
+- **Settings page fails to load**: Ensure qBittorrent WebUI is enabled and accessible
+- **Authentication errors**: Check that local bypass is enabled in qBittorrent or credentials are correct in `.env`
+- **Service won't start**: Check logs with `journalctl -u qbit-mobile -n 50`
+- **Port already in use**: Change the PORT in `.env` file
+
+## Support
 
 If you encounter any issues, please report them on the [GitHub issues page](https://github.com/yourusername/qbit-mobile/issues).
 

@@ -1,7 +1,22 @@
 {
   "name": "qbit-mobile",
   "version": "1.0.0",
-  "description": "iOS-optimized qBittorrent web frontend",
+  "description": "Mobile-optimized qBittorrent web interface",
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/qbit-mobile.git"
+  },
+  "keywords": [
+    "qbittorrent",
+    "torrent",
+    "mobile",
+    "web",
+    "interface",
+    "react",
+    "typescript"
+  ],
   "type": "module",
   "scripts": {
     "dev": "vite",

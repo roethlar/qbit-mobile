@@ -37,9 +37,10 @@ dist-ssr
 *.temp
 .claude/
 Capture.*
-*.png
-*.jpg
-*.jpeg
+TODO.md
+NOTES.md
+*.bak
+*.backup
 
 # OS generated files
 Thumbs.db
