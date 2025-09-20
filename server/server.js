@@ -66,7 +66,7 @@ async function makeQbRequest(method, path, data, headers = {}) {
       const sid = cookies.find(c => c.includes('SID='));
       if (sid) {
         sessionCookie = sid.split(';')[0];
-        console.log('Updated session cookie');
+        // Updated session cookie
       }
     }
     
@@ -74,7 +74,7 @@ async function makeQbRequest(method, path, data, headers = {}) {
   } catch (error) {
     // If 401, try to login and retry
     if (error.response && error.response.status === 401) {
-      console.log('Got 401, attempting login...');
+      // Got 401, attempting login
       
       // Try to login with configured credentials or bypass
       try {
@@ -98,7 +98,7 @@ async function makeQbRequest(method, path, data, headers = {}) {
           const sid = cookies.find(c => c.includes('SID='));
           if (sid) {
             sessionCookie = sid.split(';')[0];
-            console.log('Login successful, got cookie');
+            // Login successful, got cookie
             
             // Retry original request
             config.headers['Cookie'] = sessionCookie;
@@ -108,12 +108,12 @@ async function makeQbRequest(method, path, data, headers = {}) {
         
         // If no cookie but login OK, we're in bypass mode or auth succeeded
         if (loginResponse.data === 'Ok.') {
-          console.log(qbUser ? 'Login OK with credentials' : 'Login OK - bypass mode');
+          // Login OK
           sessionCookie = ''; // Clear cookie for bypass mode or auth mode without cookies
           return await axios(config);
         }
       } catch (loginError) {
-        console.error('Login failed:', loginError.message);
+        // Login failed
       }
     }
     
@@ -123,9 +123,7 @@ async function makeQbRequest(method, path, data, headers = {}) {
 
 // Special handler for torrent uploads
 app.post('/api/v2/torrents/add', upload.any(), async (req, res) => {
-  console.log('Handling torrent upload');
-  console.log('Files:', req.files);
-  console.log('Body:', req.body);
+  // Handling torrent upload
   
   try {
     const FormData = (await import('form-data')).default;
@@ -154,7 +152,7 @@ app.post('/api/v2/torrents/add', upload.any(), async (req, res) => {
     
     res.status(response.status).send(response.data);
   } catch (error) {
-    console.error('Torrent upload error:', error.message);
+    // Torrent upload error
     if (error.response) {
       res.status(error.response.status).send(error.response.data);
     } else {
@@ -166,7 +164,7 @@ app.post('/api/v2/torrents/add', upload.any(), async (req, res) => {
 // Proxy all other API requests
 app.use('/api/v2', async (req, res) => {
   const path = req.url;
-  console.log(`Proxying ${req.method} /api/v2${path}`);
+  // Proxying API request
   
   try {
     let data = req.body;
@@ -185,7 +183,7 @@ app.use('/api/v2', async (req, res) => {
     const response = await makeQbRequest(req.method, path, data, headers);
     res.status(response.status).send(response.data);
   } catch (error) {
-    console.error('Proxy error:', error.message);
+    // Proxy error
     if (error.response) {
       res.status(error.response.status).send(error.response.data);
     } else {
@@ -201,15 +199,14 @@ if (fs.existsSync(distPath)) {
   app.get('*', (req, res) => {
     res.sendFile(path.join(distPath, 'index.html'));
   });
-  console.log(`Serving frontend from ${distPath}`);
+  // Serving frontend
 }
 
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 
 app.listen(PORT, HOST, async () => {
-  console.log(`Server running on http://${HOST}:${PORT}`);
-  console.log(`Proxying to qBittorrent at ${qbHost}:${qbPort}`);
+  // Server running
   
   // Try initial login
   try {
@@ -220,9 +217,8 @@ app.listen(PORT, HOST, async () => {
     await makeQbRequest('POST', '/auth/login', loginData, {
       'Content-Type': 'application/x-www-form-urlencoded'
     });
-    console.log('Initial authentication successful');
-    console.log(`Auth mode: ${qbUser ? 'Username/Password' : 'Local bypass'}`);
+    // Initial authentication successful
   } catch (error) {
-    console.log('Initial authentication skipped:', error.message);
+    // Initial authentication skipped
   }
 });

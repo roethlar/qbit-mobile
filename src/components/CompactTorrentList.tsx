@@ -23,7 +23,7 @@ export function CompactTorrentList({ torrents, onPause, onResume, onDelete, onTo
   const [currentPage, setCurrentPage] = useState(1);
   const [sortBy, setSortBy] = useState<'name' | 'size' | 'progress' | 'dlspeed' | 'upspeed' | 'added_on' | 'state'>(() => {
     const saved = localStorage.getItem('qbit-sort-by');
-    return (saved as any) || 'name';
+    return (saved as 'name' | 'size' | 'progress' | 'dlspeed' | 'upspeed' | 'added_on' | 'state') || 'name';
   });
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(() => {
     const saved = localStorage.getItem('qbit-sort-order');
@@ -73,7 +73,7 @@ export function CompactTorrentList({ torrents, onPause, onResume, onDelete, onTo
     
     // Sort torrents
     const sorted = [...filtered].sort((a, b) => {
-      let aValue: any, bValue: any;
+      let aValue: string | number, bValue: string | number;
       
       switch (sortBy) {
         case 'name':

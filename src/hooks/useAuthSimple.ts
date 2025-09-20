@@ -11,7 +11,7 @@ export function useAuthSimple() {
         // Ensure API is initialized first
         await qbApi.ensureInitialized();
       } catch (error) {
-        console.error('Auth initialization error:', error);
+        // Auth initialization error
       } finally {
         // Always proceed - qBittorrent is configured for local access
         setIsReady(true);

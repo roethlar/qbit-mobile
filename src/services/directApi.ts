@@ -12,15 +12,13 @@ const api = axios.create({
 });
 
 export async function getTorrents(): Promise<Torrent[]> {
-  console.log('getTorrents called, making request to:', api.defaults.baseURL + '/torrents/info');
+  // Making torrents request
   try {
     const response = await api.get('/torrents/info');
-    console.log('Got torrents response:', response);
-    console.log('Got torrents data:', response.data?.length || 0);
+    // Got torrents response
     return response.data || [];
   } catch (error) {
-    console.error('Failed to get torrents - full error:', error);
-    console.error('Error response:', error.response);
+    // Failed to get torrents
     throw error; // Let React Query handle the error instead of returning empty array
   }
 }
@@ -30,7 +28,7 @@ export async function getGlobalStats(): Promise<GlobalTransferInfo | null> {
     const response = await api.get('/transfer/info');
     return response.data;
   } catch (error) {
-    console.error('Failed to get stats:', error);
+    // Failed to get stats
     return null;
   }
 }

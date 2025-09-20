@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Plus, Settings, RefreshCw, Moon, Sun } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { Layout, Header, FloatingActionButton, Card } from '../components/Layout';
@@ -6,6 +6,7 @@ import { CompactTorrentList } from '../components/CompactTorrentList';
 import { AddTorrent } from '../components/AddTorrent';
 import { useDirectTorrents, useDirectGlobalStats, useDirectTorrentActions } from '../hooks/useDirectTorrents';
 import { formatBytes, formatSpeed } from '../utils/formatters';
+import { getErrorMessage } from '../types/errors';
 import type { AddTorrentOptions } from '../components/AddTorrent';
 
 interface DashboardProps {
@@ -25,10 +26,7 @@ export function Dashboard({ onLogout, onShowSettings }: DashboardProps) {
   const { toggleTheme, isDark } = useTheme();
   const { data: torrents = [], isLoading, refetch, error } = useDirectTorrents();
   
-  // Debug logging
-  console.log('Dashboard rendered');
-  console.log('Dashboard - Torrents data:', torrents?.length, 'Loading:', isLoading, 'Error:', error);
-  console.log('Dashboard - Torrents:', torrents);
+  // Dashboard state
   const { data: globalStats } = useDirectGlobalStats();
   const {
     pauseTorrent,
@@ -38,7 +36,7 @@ export function Dashboard({ onLogout, onShowSettings }: DashboardProps) {
     addTorrentFile,
   } = useDirectTorrentActions();
 
-  const filteredTorrents = torrents.filter(torrent => {
+  const filteredTorrents = useMemo(() => torrents.filter(torrent => {
     switch (filter) {
       case 'downloading':
         return ['downloading', 'stalledDL', 'queuedDL', 'metaDL'].includes(torrent.state);
@@ -51,56 +49,56 @@ export function Dashboard({ onLogout, onShowSettings }: DashboardProps) {
       default:
         return true;
     }
-  });
+  }), [torrents, filter]);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     // No logout needed for local access
     onLogout();
-  };
+  }, [onLogout]);
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     setIsPullingToRefresh(true);
     await refetch();
     setTimeout(() => setIsPullingToRefresh(false), 300);
-  };
+  }, [refetch]);
 
-  const handleAddTorrentUrl = async (url: string, options?: AddTorrentOptions) => {
+  const handleAddTorrentUrl = useCallback(async (url: string, options?: AddTorrentOptions) => {
     try {
       setAddError(null);
       setAddSuccess(null);
       await addTorrentUrl.mutateAsync({ url, options });
       setAddSuccess('Torrent added successfully!');
       setTimeout(() => setAddSuccess(null), 3000);
-    } catch (error: any) {
-      console.error('Failed to add torrent:', error);
-      const errorMsg = error?.response?.data?.error || error?.message || 'Failed to add torrent';
+    } catch (error) {
+      // Failed to add torrent
+      const errorMsg = getErrorMessage(error);
       setAddError(errorMsg);
       setTimeout(() => setAddError(null), 5000);
     }
-  };
+  }, [addTorrentUrl]);
 
-  const handleAddTorrentFile = async (file: File, options?: AddTorrentOptions) => {
+  const handleAddTorrentFile = useCallback(async (file: File, options?: AddTorrentOptions) => {
     try {
       setAddError(null);
       setAddSuccess(null);
       await addTorrentFile.mutateAsync({ file, options });
       setAddSuccess('Torrent file added successfully!');
       setTimeout(() => setAddSuccess(null), 3000);
-    } catch (error: any) {
-      console.error('Failed to add torrent:', error);
-      const errorMsg = error?.response?.data?.error || error?.message || 'Failed to add torrent file';
+    } catch (error) {
+      // Failed to add torrent
+      const errorMsg = getErrorMessage(error);
       setAddError(errorMsg);
       setTimeout(() => setAddError(null), 5000);
     }
-  };
+  }, [addTorrentFile]);
 
-  const filters = [
+  const filters = useMemo(() => [
     { key: 'all', label: '●', count: torrents?.length || 0 },
     { key: 'downloading', label: '↓', count: torrents?.filter(t => ['downloading', 'stalledDL', 'queuedDL', 'metaDL'].includes(t.state)).length || 0 },
     { key: 'seeding', label: '↑', count: torrents?.filter(t => ['uploading', 'stalledUP', 'queuedUP'].includes(t.state)).length || 0 },
     { key: 'paused', label: '⏸', count: torrents?.filter(t => ['pausedDL', 'pausedUP'].includes(t.state)).length || 0 },
     { key: 'completed', label: '✓', count: torrents?.filter(t => t.progress >= 1).length || 0 },
-  ];
+  ], [torrents]);
 
   // Auto-hide stats on scroll for more space
   useEffect(() => {

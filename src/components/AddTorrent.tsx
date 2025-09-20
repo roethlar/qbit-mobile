@@ -143,7 +143,7 @@ interface TorrentOptionsProps {
 }
 
 function TorrentOptions({ options, onChange }: TorrentOptionsProps) {
-  const updateOption = (key: keyof AddTorrentOptions, value: any) => {
+  const updateOption = (key: keyof AddTorrentOptions, value: string | boolean | number) => {
     onChange({ ...options, [key]: value });
   };
 

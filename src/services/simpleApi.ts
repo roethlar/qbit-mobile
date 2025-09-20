@@ -1,5 +1,6 @@
 import axios from 'axios';
 import type { Torrent, GlobalTransferInfo } from '../types/qbittorrent';
+import type { ApiError } from '../types/errors';
 
 const api = axios.create({
   baseURL: '/api/v2',
@@ -18,10 +19,10 @@ async function ensureAuth() {
   try {
     // Just do a simple POST to login with no data
     const response = await api.post('/auth/login');
-    console.log('Auth response:', response.data);
+    // Auth response received
     isInitialized = true;
   } catch (error) {
-    console.error('Auth failed, but continuing anyway:', error);
+    // Auth failed, continuing anyway
     isInitialized = true; // Continue anyway
   }
 }
@@ -31,11 +32,11 @@ export async function getTorrents(): Promise<Torrent[]> {
   
   try {
     const response = await api.get('/torrents/info');
-    console.log('Got torrents:', response.data?.length || 0);
+    // Got torrents
     return response.data || [];
-  } catch (error: any) {
-    if (error?.response?.status === 401) {
-      console.log('Got 401, retrying auth...');
+  } catch (error) {
+    if ((error as ApiError)?.response?.status === 401) {
+      // Got 401, retrying auth
       isInitialized = false;
       await ensureAuth();
       
@@ -43,7 +44,7 @@ export async function getTorrents(): Promise<Torrent[]> {
       const response = await api.get('/torrents/info');
       return response.data || [];
     }
-    console.error('Failed to get torrents:', error);
+    // Failed to get torrents
     return [];
   }
 }
@@ -55,7 +56,7 @@ export async function getGlobalStats(): Promise<GlobalTransferInfo | null> {
     const response = await api.get('/transfer/info');
     return response.data;
   } catch (error) {
-    console.error('Failed to get stats:', error);
+    // Failed to get stats
     return null;
   }
 }

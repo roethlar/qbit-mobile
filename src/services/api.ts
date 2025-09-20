@@ -1,5 +1,6 @@
 import axios from 'axios';
 import type { Torrent, GlobalTransferInfo, TorrentInfo, Preferences } from '../types/qbittorrent';
+import type { ApiError } from '../types/errors';
 
 const api = axios.create({
   baseURL: '/api/v2',
@@ -43,12 +44,12 @@ export class QBittorrentAPI {
         
         if (response.status === 200 && response.data === 'Ok.') {
           this.isAuthenticated = true;
-          console.log('Successfully authenticated with empty credentials');
+          // Successfully authenticated with empty credentials
         } else {
-          console.error('Unexpected auth response:', response.data);
+          // Unexpected auth response
         }
       } catch (error) {
-        console.error('Initial auth failed:', error);
+        // Initial auth failed
         // Try again without credentials at all
         try {
           const response2 = await api.post('/auth/login', '', {
@@ -58,10 +59,10 @@ export class QBittorrentAPI {
           });
           if (response2.status === 200 && response2.data === 'Ok.') {
             this.isAuthenticated = true;
-            console.log('Successfully authenticated without credentials');
+            // Successfully authenticated without credentials
           }
         } catch (error2) {
-          console.error('Second auth attempt failed:', error2);
+          // Second auth attempt failed
         }
       }
     })();
@@ -90,7 +91,7 @@ export class QBittorrentAPI {
         return { success: false, message: 'Invalid credentials' };
       }
     } catch (error) {
-      console.error('Login failed:', error);
+      // Login failed
       return { success: false, message: 'Connection failed' };
     }
   }
@@ -100,7 +101,7 @@ export class QBittorrentAPI {
       await api.post('/auth/logout');
       this.isAuthenticated = false;
     } catch (error) {
-      console.error('Logout failed:', error);
+      // Logout failed
     }
   }
 
@@ -142,27 +143,27 @@ export class QBittorrentAPI {
 
     try {
       const response = await api.get('/torrents/info', { params });
-      console.log('API getTorrents response:', response.data?.length || 0, 'torrents');
+      // API getTorrents response
       return response.data || [];
-    } catch (error: any) {
+    } catch (error) {
       // If 401, try to re-authenticate once
-      if (error?.response?.status === 401) {
-        console.log('Got 401, trying to re-authenticate...');
+      if ((error as ApiError)?.response?.status === 401) {
+        // Got 401, trying to re-authenticate
         this.initPromise = null; // Reset init promise
         await this.initialize();
         
         // Try the request again
         try {
           const response = await api.get('/torrents/info', { params });
-          console.log('API getTorrents response after re-auth:', response.data?.length || 0, 'torrents');
+          // API getTorrents response after re-auth
           return response.data || [];
         } catch (retryError) {
-          console.error('Failed after re-auth:', retryError);
+          // Failed after re-auth
           throw retryError;
         }
       }
       
-      console.error('Failed to fetch torrents - full error:', error);
+      // Failed to fetch torrents
       throw error;
     }
   }
