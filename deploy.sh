@@ -115,7 +115,7 @@ npm run build
 
 # Remove dev dependencies after build
 print_msg "Cleaning up dev dependencies..."
-npm ci --production || npm install --production
+npm prune --production
 
 # Service user configuration (only for fresh installs)
 if [ "$IS_UPDATE" = false ]; then
