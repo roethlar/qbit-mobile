@@ -35,16 +35,19 @@ app.use('/api/v2', async (req, res) => {
   const reqPath = req.url;
 
   try {
-    let data = req.body;
+    let data = undefined;
     let headers = {};
 
-    if (req.is('application/x-www-form-urlencoded')) {
-      headers['Content-Type'] = 'application/x-www-form-urlencoded';
-      if (typeof data === 'object') {
-        data = new URLSearchParams(data).toString();
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      data = req.body;
+      if (req.is('application/x-www-form-urlencoded')) {
+        headers['Content-Type'] = 'application/x-www-form-urlencoded';
+        if (typeof data === 'object') {
+          data = new URLSearchParams(data).toString();
+        }
+      } else if (req.is('multipart/form-data')) {
+        headers = req.headers;
       }
-    } else if (req.is('multipart/form-data')) {
-      headers = req.headers;
     }
 
     const response = await makeQbRequest(req.method, reqPath, data, headers);

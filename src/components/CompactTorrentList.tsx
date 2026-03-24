@@ -1,13 +1,10 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { Play, Pause, Trash2, MoreVertical, Search, X, ArrowUpDown, ArrowUp, ArrowDown, Tag } from 'lucide-react';
-import { List } from 'react-window';
 import type { Torrent } from '../types/qbittorrent';
 import { formatBytes, formatSpeed, formatProgress, getStateColor, getStateText } from '../utils/formatters';
 import { useTorrentFilters } from '../hooks/useTorrentFilters';
 import { BottomSheet } from './Layout';
 import { clsx } from 'clsx';
-
-const ROW_HEIGHT = 56;
 
 interface CompactTorrentListProps {
   torrents: Torrent[];
@@ -24,8 +21,6 @@ export function CompactTorrentList({ torrents, onPause, onResume, onDelete, onTo
   const [showSearch, setShowSearch] = useState(false);
   const [showTags, setShowTags] = useState(false);
   const [showSortOptions, setShowSortOptions] = useState(false);
-  const [listHeight, setListHeight] = useState(400);
-  const listContainerRef = useRef<HTMLDivElement>(null);
 
   const {
     searchQuery, setSearchQuery,
@@ -36,18 +31,6 @@ export function CompactTorrentList({ torrents, onPause, onResume, onDelete, onTo
     filteredAndSortedTorrents,
     handleSort,
   } = useTorrentFilters(torrents);
-
-  const updateHeight = useCallback(() => {
-    if (listContainerRef.current) {
-      setListHeight(listContainerRef.current.clientHeight);
-    }
-  }, []);
-
-  useEffect(() => {
-    updateHeight();
-    window.addEventListener('resize', updateHeight);
-    return () => window.removeEventListener('resize', updateHeight);
-  }, [updateHeight]);
 
   const handleTorrentClick = (torrent: Torrent) => {
     if (onTorrentClick) {
@@ -245,29 +228,16 @@ export function CompactTorrentList({ torrents, onPause, onResume, onDelete, onTo
         )}
       </div>
 
-      {/* Virtualized Torrent List */}
-      <div className="flex-1" ref={listContainerRef}>
-        <List
-          height={listHeight}
-          width="100%"
-          itemCount={filteredAndSortedTorrents.length}
-          itemSize={ROW_HEIGHT}
-          overscanCount={5}
-          itemKey={(index) => filteredAndSortedTorrents[index].hash}
-        >
-          {({ index, style }) => {
-            const torrent = filteredAndSortedTorrents[index];
-            return (
-              <div style={style}>
-                <CompactTorrentRow
-                  torrent={torrent}
-                  onClick={() => handleTorrentClick(torrent)}
-                  onActionClick={(e) => handleActionClick(torrent, e)}
-                />
-              </div>
-            );
-          }}
-        </List>
+      {/* Torrent List */}
+      <div className="flex-1 overflow-auto">
+        {filteredAndSortedTorrents.map((torrent) => (
+          <CompactTorrentRow
+            key={torrent.hash}
+            torrent={torrent}
+            onClick={() => handleTorrentClick(torrent)}
+            onActionClick={(e) => handleActionClick(torrent, e)}
+          />
+        ))}
       </div>
 
       {/* Action Sheets */}
@@ -351,8 +321,7 @@ function CompactTorrentRow({ torrent, onClick, onActionClick }: CompactTorrentRo
 
   return (
     <div
-      className="border-b border-gray-100 dark:border-gray-700 px-2 active:bg-gray-50 dark:active:bg-gray-700 transition-colors cursor-pointer flex items-center"
-      style={{ height: ROW_HEIGHT }}
+      className="border-b border-gray-100 dark:border-gray-700 px-2 py-1.5 active:bg-gray-50 dark:active:bg-gray-700 transition-colors cursor-pointer"
       onClick={onClick}
     >
       <div className="flex items-center justify-between">
