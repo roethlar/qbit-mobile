@@ -25,10 +25,6 @@ export function Dashboard({ onLogout, onShowSettings }: DashboardProps) {
   const { toggleTheme, isDark } = useTheme();
   const { data: torrents = [], isLoading, refetch, error } = useDirectTorrents();
   
-  // Debug logging
-  console.log('Dashboard rendered');
-  console.log('Dashboard - Torrents data:', torrents?.length, 'Loading:', isLoading, 'Error:', error);
-  console.log('Dashboard - Torrents:', torrents);
   const { data: globalStats } = useDirectGlobalStats();
   const {
     pauseTorrent,

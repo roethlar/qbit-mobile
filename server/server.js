@@ -66,7 +66,6 @@ async function makeQbRequest(method, path, data, headers = {}) {
       const sid = cookies.find(c => c.includes('SID='));
       if (sid) {
         sessionCookie = sid.split(';')[0];
-        console.log('Updated session cookie');
       }
     }
     
@@ -74,8 +73,7 @@ async function makeQbRequest(method, path, data, headers = {}) {
   } catch (error) {
     // If 401, try to login and retry
     if (error.response && error.response.status === 401) {
-      console.log('Got 401, attempting login...');
-      
+
       // Try to login with configured credentials or bypass
       try {
         const loginData = qbUser ? 
@@ -98,8 +96,7 @@ async function makeQbRequest(method, path, data, headers = {}) {
           const sid = cookies.find(c => c.includes('SID='));
           if (sid) {
             sessionCookie = sid.split(';')[0];
-            console.log('Login successful, got cookie');
-            
+
             // Retry original request
             config.headers['Cookie'] = sessionCookie;
             return await axios(config);
@@ -108,7 +105,6 @@ async function makeQbRequest(method, path, data, headers = {}) {
         
         // If no cookie but login OK, we're in bypass mode or auth succeeded
         if (loginResponse.data === 'Ok.') {
-          console.log(qbUser ? 'Login OK with credentials' : 'Login OK - bypass mode');
           sessionCookie = ''; // Clear cookie for bypass mode or auth mode without cookies
           return await axios(config);
         }
@@ -123,10 +119,6 @@ async function makeQbRequest(method, path, data, headers = {}) {
 
 // Special handler for torrent uploads
 app.post('/api/v2/torrents/add', upload.any(), async (req, res) => {
-  console.log('Handling torrent upload');
-  console.log('Files:', req.files);
-  console.log('Body:', req.body);
-  
   try {
     const FormData = (await import('form-data')).default;
     const formData = new FormData();
@@ -166,7 +158,6 @@ app.post('/api/v2/torrents/add', upload.any(), async (req, res) => {
 // Proxy all other API requests
 app.use('/api/v2', async (req, res) => {
   const path = req.url;
-  console.log(`Proxying ${req.method} /api/v2${path}`);
   
   try {
     let data = req.body;

@@ -12,11 +12,8 @@ const api = axios.create({
 });
 
 export async function getTorrents(): Promise<Torrent[]> {
-  console.log('getTorrents called, making request to:', api.defaults.baseURL + '/torrents/info');
   try {
     const response = await api.get('/torrents/info');
-    console.log('Got torrents response:', response);
-    console.log('Got torrents data:', response.data?.length || 0);
     return response.data || [];
   } catch (error) {
     console.error('Failed to get torrents - full error:', error);

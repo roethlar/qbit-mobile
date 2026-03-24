@@ -43,7 +43,6 @@ export class QBittorrentAPI {
         
         if (response.status === 200 && response.data === 'Ok.') {
           this.isAuthenticated = true;
-          console.log('Successfully authenticated with empty credentials');
         } else {
           console.error('Unexpected auth response:', response.data);
         }
@@ -58,7 +57,6 @@ export class QBittorrentAPI {
           });
           if (response2.status === 200 && response2.data === 'Ok.') {
             this.isAuthenticated = true;
-            console.log('Successfully authenticated without credentials');
           }
         } catch (error2) {
           console.error('Second auth attempt failed:', error2);
@@ -142,19 +140,16 @@ export class QBittorrentAPI {
 
     try {
       const response = await api.get('/torrents/info', { params });
-      console.log('API getTorrents response:', response.data?.length || 0, 'torrents');
       return response.data || [];
     } catch (error: any) {
       // If 401, try to re-authenticate once
       if (error?.response?.status === 401) {
-        console.log('Got 401, trying to re-authenticate...');
         this.initPromise = null; // Reset init promise
         await this.initialize();
         
         // Try the request again
         try {
           const response = await api.get('/torrents/info', { params });
-          console.log('API getTorrents response after re-auth:', response.data?.length || 0, 'torrents');
           return response.data || [];
         } catch (retryError) {
           console.error('Failed after re-auth:', retryError);
