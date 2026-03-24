@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Play, Pause, Trash2, MoreVertical, Search, X, ArrowUpDown, ArrowUp, ArrowDown, Tag } from 'lucide-react';
+import { List } from 'react-window';
 import type { Torrent } from '../types/qbittorrent';
 import { formatBytes, formatSpeed, formatProgress, getStateColor, getStateText } from '../utils/formatters';
 import { useTorrentFilters } from '../hooks/useTorrentFilters';
 import { BottomSheet } from './Layout';
 import { clsx } from 'clsx';
+
+const ROW_HEIGHT = 56;
 
 interface CompactTorrentListProps {
   torrents: Torrent[];
@@ -21,18 +24,30 @@ export function CompactTorrentList({ torrents, onPause, onResume, onDelete, onTo
   const [showSearch, setShowSearch] = useState(false);
   const [showTags, setShowTags] = useState(false);
   const [showSortOptions, setShowSortOptions] = useState(false);
+  const [listHeight, setListHeight] = useState(400);
+  const listContainerRef = useRef<HTMLDivElement>(null);
 
   const {
     searchQuery, setSearchQuery,
-    currentPage, setCurrentPage,
+    setCurrentPage,
     sortBy, sortOrder,
     selectedTag, setSelectedTag,
     availableTags,
     filteredAndSortedTorrents,
-    paginatedTorrents,
-    totalPages,
     handleSort,
   } = useTorrentFilters(torrents);
+
+  const updateHeight = useCallback(() => {
+    if (listContainerRef.current) {
+      setListHeight(listContainerRef.current.clientHeight);
+    }
+  }, []);
+
+  useEffect(() => {
+    updateHeight();
+    window.addEventListener('resize', updateHeight);
+    return () => window.removeEventListener('resize', updateHeight);
+  }, [updateHeight]);
 
   const handleTorrentClick = (torrent: Torrent) => {
     if (onTorrentClick) {
@@ -98,23 +113,29 @@ export function CompactTorrentList({ torrents, onPause, onResume, onDelete, onTo
             {availableTags.length > 0 && (
               <button
                 onClick={() => setShowTags(!showTags)}
-                className="p-1 text-gray-500 hover:text-gray-700 rounded active:bg-gray-100 relative"
+                aria-label="Filter by tag"
+                aria-expanded={showTags}
+                className="p-2 text-gray-500 hover:text-gray-700 rounded active:bg-gray-100 relative"
               >
                 <Tag className="w-4 h-4" />
                 {selectedTag && (
-                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary-600 rounded-full"></span>
+                  <span className="absolute top-0.5 right-0.5 w-2 h-2 bg-primary-600 rounded-full"></span>
                 )}
               </button>
             )}
             <button
               onClick={() => setShowSortOptions(!showSortOptions)}
-              className="p-1 text-gray-500 hover:text-gray-700 rounded active:bg-gray-100"
+              aria-label="Sort torrents"
+              aria-expanded={showSortOptions}
+              className="p-2 text-gray-500 hover:text-gray-700 rounded active:bg-gray-100"
             >
               <ArrowUpDown className="w-4 h-4" />
             </button>
             <button
               onClick={() => setShowSearch(!showSearch)}
-              className="p-1 text-gray-500 hover:text-gray-700 rounded active:bg-gray-100"
+              aria-label={showSearch ? 'Close search' : 'Search torrents'}
+              aria-expanded={showSearch}
+              className="p-2 text-gray-500 hover:text-gray-700 rounded active:bg-gray-100"
             >
               {showSearch ? <X className="w-4 h-4" /> : <Search className="w-4 h-4" />}
             </button>
@@ -214,6 +235,7 @@ export function CompactTorrentList({ torrents, onPause, onResume, onDelete, onTo
                   setSearchQuery('');
                   setCurrentPage(1);
                 }}
+                aria-label="Clear search"
                 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
               >
                 <X className="w-4 h-4" />
@@ -223,44 +245,30 @@ export function CompactTorrentList({ torrents, onPause, onResume, onDelete, onTo
         )}
       </div>
 
-      {/* Compact Torrent List */}
-      <div className="flex-1 overflow-auto">
-        {paginatedTorrents.map((torrent, index) => (
-          <CompactTorrentRow
-            key={`${torrent.hash}-${sortBy}-${sortOrder}-${index}`}
-            torrent={torrent}
-            onClick={() => handleTorrentClick(torrent)}
-            onActionClick={(e) => handleActionClick(torrent, e)}
-          />
-        ))}
+      {/* Virtualized Torrent List */}
+      <div className="flex-1" ref={listContainerRef}>
+        <List
+          height={listHeight}
+          width="100%"
+          itemCount={filteredAndSortedTorrents.length}
+          itemSize={ROW_HEIGHT}
+          overscanCount={5}
+          itemKey={(index) => filteredAndSortedTorrents[index].hash}
+        >
+          {({ index, style }) => {
+            const torrent = filteredAndSortedTorrents[index];
+            return (
+              <div style={style}>
+                <CompactTorrentRow
+                  torrent={torrent}
+                  onClick={() => handleTorrentClick(torrent)}
+                  onActionClick={(e) => handleActionClick(torrent, e)}
+                />
+              </div>
+            );
+          }}
+        </List>
       </div>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="bg-white dark:bg-gray-850 border-t border-gray-100 dark:border-gray-700 p-3">
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-              disabled={currentPage === 1}
-              className="px-3 py-1 text-sm font-medium text-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed"
-            >
-              Previous
-            </button>
-            
-            <span className="text-sm text-gray-600">
-              Page {currentPage} of {totalPages}
-            </span>
-            
-            <button
-              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-              disabled={currentPage === totalPages}
-              className="px-3 py-1 text-sm font-medium text-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Action Sheets */}
       <BottomSheet
@@ -342,8 +350,9 @@ function CompactTorrentRow({ torrent, onClick, onActionClick }: CompactTorrentRo
   const isPaused = torrent.state === 'pausedDL' || torrent.state === 'pausedUP';
 
   return (
-    <div 
-      className="border-b border-gray-100 dark:border-gray-700 px-2 py-1.5 active:bg-gray-50 dark:active:bg-gray-700 transition-colors cursor-pointer"
+    <div
+      className="border-b border-gray-100 dark:border-gray-700 px-2 active:bg-gray-50 dark:active:bg-gray-700 transition-colors cursor-pointer flex items-center"
+      style={{ height: ROW_HEIGHT }}
       onClick={onClick}
     >
       <div className="flex items-center justify-between">
@@ -359,7 +368,14 @@ function CompactTorrentRow({ torrent, onClick, onActionClick }: CompactTorrentRo
           </div>
           
           {/* Progress bar */}
-          <div className="w-full bg-gray-200 rounded-full h-0.5 mt-0.5">
+          <div
+            className="w-full bg-gray-200 rounded-full h-0.5 mt-0.5"
+            role="progressbar"
+            aria-valuenow={Math.round(torrent.progress * 100)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={`${torrent.name} progress`}
+          >
             <div
               className={clsx(
                 'h-0.5 rounded-full transition-all duration-300',
@@ -393,6 +409,7 @@ function CompactTorrentRow({ torrent, onClick, onActionClick }: CompactTorrentRo
         {/* Right side - Action button */}
         <button
           onClick={onActionClick}
+          aria-label={`Actions for ${torrent.name}`}
           className="p-2 -mr-2 text-gray-400 active:text-gray-600 transition-colors flex-shrink-0"
         >
           <MoreVertical className="w-4 h-4" />

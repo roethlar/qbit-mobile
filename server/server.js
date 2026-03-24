@@ -2,21 +2,17 @@
 
 import 'dotenv/config';
 import express from 'express';
-import axios from 'axios';
 import path from 'path';
 import fs from 'fs';
-import multer from 'multer';
 import { fileURLToPath } from 'url';
+import { makeQbRequest, initialLogin, qbHost, qbPort } from './qbClient.js';
+import torrentsRouter from './routes/torrents.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 
-// Setup multer for file uploads
-const upload = multer();
-
-// Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -31,139 +27,17 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
-// qBittorrent configuration
-const qbHost = process.env.QBITTORRENT_HOST || 'localhost';
-const qbPort = process.env.QBITTORRENT_PORT || 8080;
-const qbUser = process.env.QBITTORRENT_USERNAME || '';
-const qbPass = process.env.QBITTORRENT_PASSWORD || '';
-
-// Store cookie globally
-let sessionCookie = null;
-
-// Function to make authenticated request
-async function makeQbRequest(method, path, data, headers = {}) {
-  const config = {
-    method,
-    url: `http://${qbHost}:${qbPort}/api/v2${path}`,
-    headers: {
-      ...headers,
-      'Cookie': sessionCookie || ''
-    },
-    timeout: 30000
-  };
-  
-  if (data !== undefined) {
-    config.data = data;
-  }
-  
-  try {
-    const response = await axios(config);
-    
-    // Update cookie if we get one
-    const setCookie = response.headers['set-cookie'];
-    if (setCookie) {
-      const cookies = Array.isArray(setCookie) ? setCookie : [setCookie];
-      const sid = cookies.find(c => c.includes('SID='));
-      if (sid) {
-        sessionCookie = sid.split(';')[0];
-      }
-    }
-    
-    return response;
-  } catch (error) {
-    // If 401, try to login and retry
-    if (error.response && error.response.status === 401) {
-
-      // Try to login with configured credentials or bypass
-      try {
-        const loginData = qbUser ? 
-          `username=${encodeURIComponent(qbUser)}&password=${encodeURIComponent(qbPass)}` :
-          'username=&password=';
-        
-        const loginResponse = await axios({
-          method: 'POST',
-          url: `http://${qbHost}:${qbPort}/api/v2/auth/login`,
-          data: loginData,
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          }
-        });
-        
-        // Get cookie from login
-        const setCookie = loginResponse.headers['set-cookie'];
-        if (setCookie) {
-          const cookies = Array.isArray(setCookie) ? setCookie : [setCookie];
-          const sid = cookies.find(c => c.includes('SID='));
-          if (sid) {
-            sessionCookie = sid.split(';')[0];
-
-            // Retry original request
-            config.headers['Cookie'] = sessionCookie;
-            return await axios(config);
-          }
-        }
-        
-        // If no cookie but login OK, we're in bypass mode or auth succeeded
-        if (loginResponse.data === 'Ok.') {
-          sessionCookie = ''; // Clear cookie for bypass mode or auth mode without cookies
-          return await axios(config);
-        }
-      } catch (loginError) {
-        console.error('Login failed:', loginError.message);
-      }
-    }
-    
-    throw error;
-  }
-}
-
-// Special handler for torrent uploads
-app.post('/api/v2/torrents/add', upload.any(), async (req, res) => {
-  try {
-    const FormData = (await import('form-data')).default;
-    const formData = new FormData();
-    
-    // Add form fields
-    Object.entries(req.body).forEach(([key, value]) => {
-      if (value !== undefined && value !== '') {
-        formData.append(key, value);
-      }
-    });
-    
-    // Add files
-    if (req.files && req.files.length > 0) {
-      req.files.forEach(file => {
-        formData.append(file.fieldname, file.buffer, {
-          filename: file.originalname,
-          contentType: file.mimetype
-        });
-      });
-    }
-    
-    const response = await makeQbRequest('POST', '/torrents/add', formData, {
-      ...formData.getHeaders()
-    });
-    
-    res.status(response.status).send(response.data);
-  } catch (error) {
-    console.error('Torrent upload error:', error.message);
-    if (error.response) {
-      res.status(error.response.status).send(error.response.data);
-    } else {
-      res.status(500).json({ error: 'Upload failed' });
-    }
-  }
-});
+// Torrent upload route (must come before generic proxy)
+app.use('/api/v2', torrentsRouter);
 
 // Proxy all other API requests
 app.use('/api/v2', async (req, res) => {
-  const path = req.url;
-  
+  const reqPath = req.url;
+
   try {
     let data = req.body;
     let headers = {};
-    
-    // Handle different content types
+
     if (req.is('application/x-www-form-urlencoded')) {
       headers['Content-Type'] = 'application/x-www-form-urlencoded';
       if (typeof data === 'object') {
@@ -172,8 +46,8 @@ app.use('/api/v2', async (req, res) => {
     } else if (req.is('multipart/form-data')) {
       headers = req.headers;
     }
-    
-    const response = await makeQbRequest(req.method, path, data, headers);
+
+    const response = await makeQbRequest(req.method, reqPath, data, headers);
     res.status(response.status).send(response.data);
   } catch (error) {
     console.error('Proxy error:', error.message);
@@ -201,18 +75,9 @@ const HOST = process.env.HOST || '0.0.0.0';
 app.listen(PORT, HOST, async () => {
   console.log(`Server running on http://${HOST}:${PORT}`);
   console.log(`Proxying to qBittorrent at ${qbHost}:${qbPort}`);
-  
-  // Try initial login
+
   try {
-    const loginData = qbUser ? 
-      `username=${encodeURIComponent(qbUser)}&password=${encodeURIComponent(qbPass)}` :
-      'username=&password=';
-    
-    await makeQbRequest('POST', '/auth/login', loginData, {
-      'Content-Type': 'application/x-www-form-urlencoded'
-    });
-    console.log('Initial authentication successful');
-    console.log(`Auth mode: ${qbUser ? 'Username/Password' : 'Local bypass'}`);
+    await initialLogin();
   } catch (error) {
     console.log('Initial authentication skipped:', error.message);
   }
