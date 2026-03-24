@@ -142,8 +142,9 @@ export function Settings({ onBack }: SettingsProps) {
               <div className="flex items-center space-x-2">
                 <input
                   type="number"
+                  min="0"
                   value={preferences.dl_limit ? Math.round(preferences.dl_limit / 1024) : 0}
-                  onChange={(e) => updateDownloadLimit(parseInt(e.target.value) || 0)}
+                  onChange={(e) => updateDownloadLimit(Math.max(0, parseInt(e.target.value) || 0))}
                   placeholder="0 = unlimited"
                   className="flex-1 ios-input"
                   disabled={saving}
@@ -163,8 +164,9 @@ export function Settings({ onBack }: SettingsProps) {
               <div className="flex items-center space-x-2">
                 <input
                   type="number"
+                  min="0"
                   value={preferences.up_limit ? Math.round(preferences.up_limit / 1024) : 0}
-                  onChange={(e) => updateUploadLimit(parseInt(e.target.value) || 0)}
+                  onChange={(e) => updateUploadLimit(Math.max(0, parseInt(e.target.value) || 0))}
                   placeholder="0 = unlimited"
                   className="flex-1 ios-input"
                   disabled={saving}

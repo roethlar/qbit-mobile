@@ -1,7 +1,8 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState } from 'react';
 import { Play, Pause, Trash2, MoreVertical, Search, X, ArrowUpDown, ArrowUp, ArrowDown, Tag } from 'lucide-react';
 import type { Torrent } from '../types/qbittorrent';
 import { formatBytes, formatSpeed, formatProgress, getStateColor, getStateText } from '../utils/formatters';
+import { useTorrentFilters } from '../hooks/useTorrentFilters';
 import { BottomSheet } from './Layout';
 import { clsx } from 'clsx';
 
@@ -17,141 +18,21 @@ export function CompactTorrentList({ torrents, onPause, onResume, onDelete, onTo
   const [selectedTorrent, setSelectedTorrent] = useState<Torrent | null>(null);
   const [showActions, setShowActions] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [showTags, setShowTags] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [sortBy, setSortBy] = useState<'name' | 'size' | 'progress' | 'dlspeed' | 'upspeed' | 'added_on' | 'state'>(() => {
-    const saved = localStorage.getItem('qbit-sort-by');
-    return (saved as any) || 'name';
-  });
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(() => {
-    const saved = localStorage.getItem('qbit-sort-order');
-    return (saved as 'asc' | 'desc') || 'asc';
-  });
-  const [selectedTag, setSelectedTag] = useState<string>(() => {
-    return localStorage.getItem('qbit-selected-tag') || '';
-  });
   const [showSortOptions, setShowSortOptions] = useState(false);
-  const itemsPerPage = 5000; // Show all torrents to save space
 
-  // Get unique tags from torrents
-  const availableTags = useMemo(() => {
-    const tagSet = new Set<string>();
-    torrents.forEach(torrent => {
-      if (torrent.tags) {
-        torrent.tags.split(',').forEach(tag => {
-          const trimmedTag = tag.trim();
-          if (trimmedTag) tagSet.add(trimmedTag);
-        });
-      }
-    });
-    return Array.from(tagSet).sort();
-  }, [torrents]);
-
-  // Filter and sort torrents
-  const filteredAndSortedTorrents = useMemo(() => {
-    let filtered = torrents;
-    
-    // Filter by search query
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(torrent => 
-        torrent.name.toLowerCase().includes(query) ||
-        torrent.category.toLowerCase().includes(query) ||
-        torrent.tags.toLowerCase().includes(query) ||
-        getStateText(torrent.state).toLowerCase().includes(query)
-      );
-    }
-    
-    // Filter by tag
-    if (selectedTag) {
-      filtered = filtered.filter(torrent => 
-        torrent.tags.split(',').map(t => t.trim()).includes(selectedTag)
-      );
-    }
-    
-    // Sort torrents
-    const sorted = [...filtered].sort((a, b) => {
-      let aValue: any, bValue: any;
-      
-      switch (sortBy) {
-        case 'name':
-          aValue = a.name.toLowerCase();
-          bValue = b.name.toLowerCase();
-          break;
-        case 'size':
-          aValue = a.size;
-          bValue = b.size;
-          break;
-        case 'progress':
-          aValue = a.progress;
-          bValue = b.progress;
-          break;
-        case 'dlspeed':
-          aValue = a.dlspeed;
-          bValue = b.dlspeed;
-          break;
-        case 'upspeed':
-          aValue = a.upspeed;
-          bValue = b.upspeed;
-          break;
-        case 'added_on':
-          aValue = a.added_on;
-          bValue = b.added_on;
-          break;
-        case 'state':
-          aValue = getStateText(a.state);
-          bValue = getStateText(b.state);
-          break;
-        default:
-          return 0;
-      }
-      
-      if (typeof aValue === 'string') {
-        return sortOrder === 'asc' 
-          ? aValue.localeCompare(bValue)
-          : bValue.localeCompare(aValue);
-      } else {
-        return sortOrder === 'asc' 
-          ? aValue - bValue
-          : bValue - aValue;
-      }
-    });
-    
-    return sorted;
-  }, [torrents, searchQuery, selectedTag, sortBy, sortOrder]);
-
-  // Paginate filtered results
-  const paginatedTorrents = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return filteredAndSortedTorrents.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredAndSortedTorrents, currentPage, itemsPerPage]);
-
-  const totalPages = Math.ceil(filteredAndSortedTorrents.length / itemsPerPage);
-
-  // Save preferences to localStorage
-  useEffect(() => {
-    localStorage.setItem('qbit-sort-by', sortBy);
-  }, [sortBy]);
-
-  useEffect(() => {
-    localStorage.setItem('qbit-sort-order', sortOrder);
-  }, [sortOrder]);
-
-  useEffect(() => {
-    localStorage.setItem('qbit-selected-tag', selectedTag);
-  }, [selectedTag]);
-
-  const handleSort = (newSortBy: typeof sortBy) => {
-    if (sortBy === newSortBy) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(newSortBy);
-      setSortOrder('asc');
-    }
-    setCurrentPage(1);
-  };
+  const {
+    searchQuery, setSearchQuery,
+    currentPage, setCurrentPage,
+    sortBy, sortOrder,
+    selectedTag, setSelectedTag,
+    availableTags,
+    filteredAndSortedTorrents,
+    paginatedTorrents,
+    totalPages,
+    handleSort,
+  } = useTorrentFilters(torrents);
 
   const handleTorrentClick = (torrent: Torrent) => {
     if (onTorrentClick) {

@@ -1,10 +1,6 @@
 import axios from 'axios';
 import type { Torrent, GlobalTransferInfo } from '../types/qbittorrent';
 
-// Create axios instance that connects to our Express proxy server
-// This server runs on the same machine and makes requests from the correct network
-const proxyHost = import.meta.env.VITE_PROXY_HOST || window.location.hostname;
-const proxyPort = import.meta.env.VITE_PROXY_PORT || window.location.port || '3000';
 const api = axios.create({
   baseURL: `/api/v2`,
   timeout: 30000,
@@ -12,24 +8,13 @@ const api = axios.create({
 });
 
 export async function getTorrents(): Promise<Torrent[]> {
-  try {
-    const response = await api.get('/torrents/info');
-    return response.data || [];
-  } catch (error) {
-    console.error('Failed to get torrents - full error:', error);
-    console.error('Error response:', error.response);
-    throw error; // Let React Query handle the error instead of returning empty array
-  }
+  const response = await api.get('/torrents/info');
+  return response.data || [];
 }
 
-export async function getGlobalStats(): Promise<GlobalTransferInfo | null> {
-  try {
-    const response = await api.get('/transfer/info');
-    return response.data;
-  } catch (error) {
-    console.error('Failed to get stats:', error);
-    return null;
-  }
+export async function getGlobalStats(): Promise<GlobalTransferInfo> {
+  const response = await api.get('/transfer/info');
+  return response.data;
 }
 
 export async function pauseTorrent(hash: string): Promise<void> {

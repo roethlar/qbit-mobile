@@ -24,14 +24,28 @@ export function AddTorrent({ isOpen, onClose, onAddUrl, onAddFile }: AddTorrentP
   const [options, setOptions] = useState<AddTorrentOptions>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [urlError, setUrlError] = useState('');
+
   const handleSubmitUrl = (e: React.FormEvent) => {
     e.preventDefault();
-    if (url.trim()) {
-      onAddUrl(url.trim(), options);
-      setUrl('');
-      setOptions({});
-      onClose();
+    const trimmed = url.trim();
+    if (!trimmed) return;
+
+    const isValid = trimmed.startsWith('magnet:?') ||
+      trimmed.startsWith('http://') ||
+      trimmed.startsWith('https://') ||
+      trimmed.match(/^[a-f0-9]{40}$/i);
+
+    if (!isValid) {
+      setUrlError('Enter a magnet link, URL, or info hash');
+      return;
     }
+
+    setUrlError('');
+    onAddUrl(trimmed, options);
+    setUrl('');
+    setOptions({});
+    onClose();
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -100,12 +114,13 @@ export function AddTorrent({ isOpen, onClose, onAddUrl, onAddFile }: AddTorrentP
               <textarea
                 id="url"
                 value={url}
-                onChange={(e) => setUrl(e.target.value)}
+                onChange={(e) => { setUrl(e.target.value); setUrlError(''); }}
                 placeholder="magnet:?xt=urn:btih:... or https://..."
-                className="w-full p-3 border border-gray-300 rounded-xl resize-none text-sm"
+                className={`w-full p-3 border rounded-xl resize-none text-sm ${urlError ? 'border-red-400' : 'border-gray-300'}`}
                 rows={3}
                 required
               />
+              {urlError && <p className="text-xs text-red-500 mt-1">{urlError}</p>}
             </div>
             <TorrentOptions options={options} onChange={setOptions} />
             <button type="submit" className="w-full ios-button">
