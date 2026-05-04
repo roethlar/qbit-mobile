@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Torrent, GlobalTransferInfo } from '../types/qbittorrent';
+import type { Torrent, GlobalTransferInfo, Preferences } from '../types/qbittorrent';
 
 const api = axios.create({
   baseURL: `/api/v2`,
@@ -59,7 +59,7 @@ export async function addTorrentUrl(url: string, options?: AddTorrentOptions): P
 export async function addTorrentFile(file: File, options?: AddTorrentOptions): Promise<void> {
   const formData = new FormData();
   formData.append('torrents', file);
-  
+
   if (options) {
     Object.entries(options).forEach(([key, value]) => {
       if (value !== undefined) {
@@ -67,6 +67,18 @@ export async function addTorrentFile(file: File, options?: AddTorrentOptions): P
       }
     });
   }
-  
+
   await api.post('/torrents/add', formData);
+}
+
+export async function getPreferences(): Promise<Preferences> {
+  const response = await api.get('/app/preferences');
+  return response.data;
+}
+
+export async function setPreferences(prefs: Partial<Preferences>): Promise<void> {
+  await api.post(
+    '/app/setPreferences',
+    new URLSearchParams({ json: JSON.stringify(prefs) })
+  );
 }

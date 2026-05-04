@@ -16,10 +16,7 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider>
         {currentPage === 'dashboard' && (
-          <Dashboard
-            onLogout={() => {}}
-            onShowSettings={showSettings}
-          />
+          <Dashboard onShowSettings={showSettings} />
         )}
         {currentPage === 'settings' && (
           <Settings onBack={showDashboard} />

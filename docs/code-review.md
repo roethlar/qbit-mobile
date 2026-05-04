@@ -282,6 +282,7 @@ qBit Mobile is a small, cohesive React 18 + TypeScript + Vite SPA fronting a thi
 - **File:** `src/types/qbittorrent.ts:54-72`
 - **Problem:** Includes `forcedDL`/`forcedUP` but qBittorrent 5+ adds new states like `stoppedUP`/`stoppedDL` (renamed from paused). The `Dashboard` filter (`['pausedDL','pausedUP']`) is also broken on qBittorrent 5+.
 - **Fix:** Either widen `TorrentState` to include the new names with backward-compat fallbacks, or treat `state: string` and validate at the edge.
+- **Note (post-review):** This should arguably be **High** priority — on qBittorrent 5+ the "Paused" filter never matches anything because the state is now `stoppedDL`/`stoppedUP`. The GPT review (`static-code-review-2026-05-04.md` H9) flagged this correctly.
 
 ### M24. `getStateText` for all paused/queued/stalled states returns the same emoji
 - **File:** `src/utils/formatters.ts:100-111`

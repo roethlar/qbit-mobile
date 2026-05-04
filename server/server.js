@@ -16,13 +16,19 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// CORS headers for API routes
+// CORS: only allow same-origin or explicit ALLOWED_ORIGIN env var.
+// Wildcard CORS would let any browser-loaded page drive qBittorrent.
+const allowedOrigin = process.env.ALLOWED_ORIGIN || '';
 app.use('/api', (req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  const origin = req.headers.origin;
+  if (allowedOrigin && origin === allowedOrigin) {
+    res.header('Access-Control-Allow-Origin', allowedOrigin);
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type');
+    res.header('Vary', 'Origin');
+  }
   if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
+    return res.sendStatus(allowedOrigin && origin === allowedOrigin ? 200 : 403);
   }
   next();
 });
@@ -60,6 +66,11 @@ app.use('/api/v2', async (req, res) => {
       res.status(500).json({ error: 'Proxy error' });
     }
   }
+});
+
+// Unmatched API routes return JSON 404, not the SPA shell.
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: 'API endpoint not found' });
 });
 
 // Serve static files if dist folder exists

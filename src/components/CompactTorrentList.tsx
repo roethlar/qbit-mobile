@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { Play, Pause, Trash2, MoreVertical, Search, X, ArrowUpDown, ArrowUp, ArrowDown, Tag } from 'lucide-react';
-import type { Torrent } from '../types/qbittorrent';
+import type { Torrent, TorrentState } from '../types/qbittorrent';
+import { PAUSED_STATES } from '../types/qbittorrent';
 import { formatBytes, formatSpeed, formatProgress, getStateColor, getStateText } from '../utils/formatters';
+
+const isPausedState = (state: TorrentState) => PAUSED_STATES.includes(state);
 import { useTorrentFilters } from '../hooks/useTorrentFilters';
 import { BottomSheet } from './Layout';
 import { clsx } from 'clsx';
@@ -47,7 +50,7 @@ export function CompactTorrentList({ torrents, onPause, onResume, onDelete, onTo
   const handlePauseResume = () => {
     if (!selectedTorrent) return;
     
-    if (selectedTorrent.state === 'pausedDL' || selectedTorrent.state === 'pausedUP') {
+    if (isPausedState(selectedTorrent.state)) {
       onResume(selectedTorrent.hash);
     } else {
       onPause(selectedTorrent.hash);
@@ -251,13 +254,13 @@ export function CompactTorrentList({ torrents, onPause, onResume, onDelete, onTo
             onClick={handlePauseResume}
             className="w-full flex items-center p-4 rounded-xl bg-gray-50 dark:bg-gray-700 active:bg-gray-100 dark:active:bg-gray-600 transition-colors"
           >
-            {selectedTorrent?.state === 'pausedDL' || selectedTorrent?.state === 'pausedUP' ? (
+            {selectedTorrent && isPausedState(selectedTorrent.state) ? (
               <Play className="w-5 h-5 mr-3 text-green-600" />
             ) : (
               <Pause className="w-5 h-5 mr-3 text-orange-600" />
             )}
             <span className="text-base font-medium">
-              {selectedTorrent?.state === 'pausedDL' || selectedTorrent?.state === 'pausedUP' ? 'Resume' : 'Pause'}
+              {selectedTorrent && isPausedState(selectedTorrent.state) ? 'Resume' : 'Pause'}
             </span>
           </button>
           
@@ -317,7 +320,7 @@ interface CompactTorrentRowProps {
 
 function CompactTorrentRow({ torrent, onClick, onActionClick }: CompactTorrentRowProps) {
   const isActive = torrent.state === 'downloading' || torrent.state === 'uploading';
-  const isPaused = torrent.state === 'pausedDL' || torrent.state === 'pausedUP';
+  const isPaused = isPausedState(torrent.state);
 
   return (
     <div

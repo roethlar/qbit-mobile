@@ -70,6 +70,8 @@ export function getStateColor(state: string): string {
       return 'text-green-600';
     case 'pausedDL':
     case 'pausedUP':
+    case 'stoppedDL':
+    case 'stoppedUP':
       return 'text-gray-500';
     case 'error':
     case 'missingFiles':
@@ -98,17 +100,18 @@ export function getStateText(state: string): string {
     case 'uploading':
       return '↑';
     case 'pausedDL':
-      return '⏸';
     case 'pausedUP':
+    case 'stoppedDL':
+    case 'stoppedUP':
       return '⏸';
     case 'queuedDL':
-      return '⏳';
     case 'queuedUP':
       return '⏳';
     case 'stalledDL':
-      return '⚠';
     case 'stalledUP':
       return '⚠';
+    case 'moving':
+      return '↔';
     case 'checkingDL':
     case 'checkingUP':
     case 'checkingResumeData':

@@ -31,10 +31,11 @@ export function AddTorrent({ isOpen, onClose, onAddUrl, onAddFile }: AddTorrentP
     const trimmed = url.trim();
     if (!trimmed) return;
 
-    const isValid = trimmed.startsWith('magnet:?') ||
-      trimmed.startsWith('http://') ||
-      trimmed.startsWith('https://') ||
-      trimmed.match(/^[a-f0-9]{40}$/i);
+    const isValid =
+      /^magnet:\?/i.test(trimmed) ||
+      /^https?:\/\//i.test(trimmed) ||
+      /^[a-f0-9]{40}$/i.test(trimmed) ||
+      /^[a-f0-9]{64}$/i.test(trimmed);
 
     if (!isValid) {
       setUrlError('Enter a magnet link, URL, or info hash');

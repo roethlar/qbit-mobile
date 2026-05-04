@@ -3,7 +3,13 @@ import multer from 'multer';
 import { makeQbRequest } from '../qbClient.js';
 
 const router = Router();
-const upload = multer();
+const upload = multer({
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10 MB per file
+    files: 25,
+    fields: 50,
+  },
+});
 
 router.post('/torrents/add', upload.any(), async (req, res) => {
   try {

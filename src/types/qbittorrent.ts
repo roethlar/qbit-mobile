@@ -51,12 +51,14 @@ export interface Torrent {
   upspeed: number;
 }
 
-export type TorrentState = 
+export type TorrentState =
   | 'allocating'
   | 'downloading'
   | 'metaDL'
   | 'pausedDL'
   | 'pausedUP'
+  | 'stoppedDL' // qBittorrent 5+: renamed from pausedDL
+  | 'stoppedUP' // qBittorrent 5+: renamed from pausedUP
   | 'queuedDL'
   | 'queuedUP'
   | 'stalledDL'
@@ -64,12 +66,18 @@ export type TorrentState =
   | 'uploading'
   | 'forcedDL'
   | 'forcedUP'
+  | 'forcedMetaDL'
   | 'checkingDL'
   | 'checkingUP'
   | 'checkingResumeData'
+  | 'moving'
   | 'error'
   | 'missingFiles'
   | 'unknown';
+
+export const PAUSED_STATES: readonly TorrentState[] = ['pausedDL', 'pausedUP', 'stoppedDL', 'stoppedUP'];
+export const DOWNLOADING_STATES: readonly TorrentState[] = ['downloading', 'stalledDL', 'queuedDL', 'metaDL', 'forcedDL', 'forcedMetaDL', 'allocating'];
+export const SEEDING_STATES: readonly TorrentState[] = ['uploading', 'stalledUP', 'queuedUP', 'forcedUP'];
 
 export interface GlobalTransferInfo {
   alltime_dl: number;

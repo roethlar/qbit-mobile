@@ -1,30 +1,26 @@
-import { useState, useEffect, useRef } from 'react';
+import { useMemo, useState } from 'react';
 import { Plus, Settings, RefreshCw, Moon, Sun } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
-import { Layout, Header, FloatingActionButton, Card } from '../components/Layout';
+import { Layout, Header, FloatingActionButton } from '../components/Layout';
 import { CompactTorrentList } from '../components/CompactTorrentList';
 import { AddTorrent } from '../components/AddTorrent';
 import { useDirectTorrents, useDirectGlobalStats, useDirectTorrentActions } from '../hooks/useDirectTorrents';
-import { formatBytes, formatSpeed } from '../utils/formatters';
+import { formatSpeed } from '../utils/formatters';
+import { PAUSED_STATES, DOWNLOADING_STATES, SEEDING_STATES } from '../types/qbittorrent';
 import type { AddTorrentOptions } from '../components/AddTorrent';
 
 interface DashboardProps {
-  onLogout: () => void;
   onShowSettings: () => void;
 }
 
-export function Dashboard({ onLogout, onShowSettings }: DashboardProps) {
+export function Dashboard({ onShowSettings }: DashboardProps) {
   const [showAddTorrent, setShowAddTorrent] = useState(false);
   const [filter, setFilter] = useState<string>('all');
-  const [showStats, setShowStats] = useState(true);
   const [addError, setAddError] = useState<string | null>(null);
   const [addSuccess, setAddSuccess] = useState<string | null>(null);
-  const [isPullingToRefresh, setIsPullingToRefresh] = useState(false);
-  const scrollableRef = useRef<HTMLDivElement>(null);
-  
+
   const { toggleTheme, isDark } = useTheme();
-  const { data: torrents = [], isLoading, refetch, error } = useDirectTorrents();
-  
+  const { data: torrents = [], isLoading, refetch } = useDirectTorrents();
   const { data: globalStats } = useDirectGlobalStats();
   const {
     pauseTorrent,
@@ -37,11 +33,11 @@ export function Dashboard({ onLogout, onShowSettings }: DashboardProps) {
   const filteredTorrents = torrents.filter(torrent => {
     switch (filter) {
       case 'downloading':
-        return ['downloading', 'stalledDL', 'queuedDL', 'metaDL'].includes(torrent.state);
+        return DOWNLOADING_STATES.includes(torrent.state);
       case 'seeding':
-        return ['uploading', 'stalledUP', 'queuedUP'].includes(torrent.state);
+        return SEEDING_STATES.includes(torrent.state);
       case 'paused':
-        return ['pausedDL', 'pausedUP'].includes(torrent.state);
+        return PAUSED_STATES.includes(torrent.state);
       case 'completed':
         return torrent.progress >= 1;
       default:
@@ -49,15 +45,8 @@ export function Dashboard({ onLogout, onShowSettings }: DashboardProps) {
     }
   });
 
-  const handleLogout = async () => {
-    // No logout needed for local access
-    onLogout();
-  };
-
   const handleRefresh = async () => {
-    setIsPullingToRefresh(true);
     await refetch();
-    setTimeout(() => setIsPullingToRefresh(false), 300);
   };
 
   const handleAddTorrentUrl = async (url: string, options?: AddTorrentOptions) => {
@@ -90,26 +79,22 @@ export function Dashboard({ onLogout, onShowSettings }: DashboardProps) {
     }
   };
 
-  const filters = [
-    { key: 'all', label: '●', count: torrents?.length || 0 },
-    { key: 'downloading', label: '↓', count: torrents?.filter(t => ['downloading', 'stalledDL', 'queuedDL', 'metaDL'].includes(t.state)).length || 0 },
-    { key: 'seeding', label: '↑', count: torrents?.filter(t => ['uploading', 'stalledUP', 'queuedUP'].includes(t.state)).length || 0 },
-    { key: 'paused', label: '⏸', count: torrents?.filter(t => ['pausedDL', 'pausedUP'].includes(t.state)).length || 0 },
-    { key: 'completed', label: '✓', count: torrents?.filter(t => t.progress >= 1).length || 0 },
-  ];
-
-  // Auto-hide stats on scroll for more space
-  useEffect(() => {
-    const handleScroll = () => {
-      const shouldShowStats = window.scrollY < 100;
-      if (shouldShowStats !== showStats) {
-        setShowStats(shouldShowStats);
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [showStats]);
+  const filters = useMemo(() => {
+    const counts = { downloading: 0, seeding: 0, paused: 0, completed: 0 };
+    for (const t of torrents) {
+      if (DOWNLOADING_STATES.includes(t.state)) counts.downloading++;
+      if (SEEDING_STATES.includes(t.state)) counts.seeding++;
+      if (PAUSED_STATES.includes(t.state)) counts.paused++;
+      if (t.progress >= 1) counts.completed++;
+    }
+    return [
+      { key: 'all', label: '●', count: torrents.length },
+      { key: 'downloading', label: '↓', count: counts.downloading },
+      { key: 'seeding', label: '↑', count: counts.seeding },
+      { key: 'paused', label: '⏸', count: counts.paused },
+      { key: 'completed', label: '✓', count: counts.completed },
+    ];
+  }, [torrents]);
 
   return (
     <Layout padding={false}>

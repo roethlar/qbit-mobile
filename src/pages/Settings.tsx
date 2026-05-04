@@ -1,16 +1,31 @@
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Download, Upload, Folder, Wifi } from 'lucide-react';
 import { Layout, Header } from '../components/Layout';
-import { qbApi } from '../services/api';
-import { formatBytes, formatSpeed } from '../utils/formatters';
+import { getPreferences, setPreferences as apiSetPreferences } from '../services/directApi';
+import { formatSpeed } from '../utils/formatters';
 import type { Preferences } from '../types/qbittorrent';
 
 interface SettingsProps {
   onBack: () => void;
 }
 
+interface DraftPrefs {
+  dl_limit_kbps: number;
+  up_limit_kbps: number;
+  save_path: string;
+}
+
+function toDraft(prefs: Preferences): DraftPrefs {
+  return {
+    dl_limit_kbps: prefs.dl_limit ? Math.round(prefs.dl_limit / 1024) : 0,
+    up_limit_kbps: prefs.up_limit ? Math.round(prefs.up_limit / 1024) : 0,
+    save_path: prefs.save_path || '',
+  };
+}
+
 export function Settings({ onBack }: SettingsProps) {
   const [preferences, setPreferences] = useState<Preferences | null>(null);
+  const [draft, setDraft] = useState<DraftPrefs | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
@@ -22,8 +37,9 @@ export function Settings({ onBack }: SettingsProps) {
   const loadPreferences = async () => {
     try {
       setLoading(true);
-      const prefs = await qbApi.getPreferences();
+      const prefs = await getPreferences();
       setPreferences(prefs);
+      setDraft(toDraft(prefs));
     } catch (error) {
       console.error('Failed to load preferences:', error);
     } finally {
@@ -31,10 +47,21 @@ export function Settings({ onBack }: SettingsProps) {
     }
   };
 
-  const savePreferences = async (newPrefs: Partial<Preferences>) => {
+  const isDirty = preferences !== null && draft !== null &&
+    (draft.dl_limit_kbps !== Math.round((preferences.dl_limit || 0) / 1024) ||
+     draft.up_limit_kbps !== Math.round((preferences.up_limit || 0) / 1024) ||
+     draft.save_path !== (preferences.save_path || ''));
+
+  const handleSave = async () => {
+    if (!draft || !preferences) return;
     try {
       setSaving(true);
-      await qbApi.setPreferences(newPrefs);
+      const newPrefs: Partial<Preferences> = {
+        dl_limit: draft.dl_limit_kbps * 1024,
+        up_limit: draft.up_limit_kbps * 1024,
+        save_path: draft.save_path,
+      };
+      await apiSetPreferences(newPrefs);
       setPreferences(prev => prev ? { ...prev, ...newPrefs } : null);
       setSaveMessage('Settings saved successfully!');
       setTimeout(() => setSaveMessage(null), 3000);
@@ -47,16 +74,12 @@ export function Settings({ onBack }: SettingsProps) {
     }
   };
 
-  const updateDownloadLimit = (limit: number) => {
-    savePreferences({ dl_limit: limit * 1024 }); // Convert KB/s to B/s
+  const handleReset = () => {
+    if (preferences) setDraft(toDraft(preferences));
   };
 
-  const updateUploadLimit = (limit: number) => {
-    savePreferences({ up_limit: limit * 1024 }); // Convert KB/s to B/s
-  };
-
-  const updateSavePath = (path: string) => {
-    savePreferences({ save_path: path });
+  const updateDraft = <K extends keyof DraftPrefs>(key: K, value: DraftPrefs[K]) => {
+    setDraft(prev => prev ? { ...prev, [key]: value } : prev);
   };
 
   if (loading) {
@@ -143,8 +166,8 @@ export function Settings({ onBack }: SettingsProps) {
                 <input
                   type="number"
                   min="0"
-                  value={preferences.dl_limit ? Math.round(preferences.dl_limit / 1024) : 0}
-                  onChange={(e) => updateDownloadLimit(Math.max(0, parseInt(e.target.value) || 0))}
+                  value={draft?.dl_limit_kbps ?? 0}
+                  onChange={(e) => updateDraft('dl_limit_kbps', Math.max(0, parseInt(e.target.value, 10) || 0))}
                   placeholder="0 = unlimited"
                   className="flex-1 ios-input"
                   disabled={saving}
@@ -165,8 +188,8 @@ export function Settings({ onBack }: SettingsProps) {
                 <input
                   type="number"
                   min="0"
-                  value={preferences.up_limit ? Math.round(preferences.up_limit / 1024) : 0}
-                  onChange={(e) => updateUploadLimit(Math.max(0, parseInt(e.target.value) || 0))}
+                  value={draft?.up_limit_kbps ?? 0}
+                  onChange={(e) => updateDraft('up_limit_kbps', Math.max(0, parseInt(e.target.value, 10) || 0))}
                   placeholder="0 = unlimited"
                   className="flex-1 ios-input"
                   disabled={saving}
@@ -191,8 +214,8 @@ export function Settings({ onBack }: SettingsProps) {
             </label>
             <input
               type="text"
-              value={preferences.save_path || ''}
-              onChange={(e) => updateSavePath(e.target.value)}
+              value={draft?.save_path ?? ''}
+              onChange={(e) => updateDraft('save_path', e.target.value)}
               placeholder="/path/to/downloads"
               className="w-full ios-input"
               disabled={saving}
@@ -260,6 +283,24 @@ export function Settings({ onBack }: SettingsProps) {
               </span>
             </div>
           </div>
+        </div>
+
+        {/* Save / Reset actions */}
+        <div className="mx-4 flex items-center gap-2">
+          <button
+            onClick={handleSave}
+            disabled={!isDirty || saving}
+            className="flex-1 bg-primary-600 text-white rounded-xl py-3 px-6 font-medium active:bg-primary-700 transition-colors disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed"
+          >
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+          <button
+            onClick={handleReset}
+            disabled={!isDirty || saving}
+            className="px-6 py-3 rounded-xl font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 active:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Reset
+          </button>
         </div>
 
         {/* Spacing for FAB */}
