@@ -16,17 +16,34 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// CORS + CSRF protection: same-origin requests have no Origin header (or
-// match the host). Cross-origin browser requests have Origin set; only the
-// configured ALLOWED_ORIGIN may proceed for state-changing methods.
-// This protects against drive-by attacks since the proxy injects an
-// authenticated qBittorrent cookie on every forwarded request.
+// CORS + CSRF protection: the proxy injects an authenticated qBittorrent
+// cookie on every forwarded request, so we must reject cross-origin writes
+// to prevent drive-by attacks from any page the user happens to visit.
+//
+// Same-origin requests (Origin host matches our Host header, or no Origin)
+// are always allowed. ALLOWED_ORIGIN env var may be set to permit one
+// additional cross-origin client.
 const allowedOrigin = process.env.ALLOWED_ORIGIN || '';
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
+if (process.env.TRUST_PROXY) {
+  app.set('trust proxy', process.env.TRUST_PROXY);
+}
+
+function isSameOriginRequest(req) {
+  const origin = req.headers.origin;
+  if (!origin) return true; // No Origin → not a CORS-eligible request
+  try {
+    return new URL(origin).host === req.get('host');
+  } catch {
+    return false;
+  }
+}
+
 app.use('/api', (req, res, next) => {
   const origin = req.headers.origin;
-  const isAllowedCrossOrigin = allowedOrigin && origin === allowedOrigin;
+  const sameOrigin = isSameOriginRequest(req);
+  const isAllowedCrossOrigin = !!allowedOrigin && origin === allowedOrigin;
 
   if (isAllowedCrossOrigin) {
     res.header('Access-Control-Allow-Origin', allowedOrigin);
@@ -36,12 +53,12 @@ app.use('/api', (req, res, next) => {
   }
 
   if (req.method === 'OPTIONS') {
-    return res.sendStatus(isAllowedCrossOrigin ? 200 : 403);
+    return res.sendStatus(sameOrigin || isAllowedCrossOrigin ? 200 : 403);
   }
 
-  // Reject cross-origin state-changing requests outright. Without this, a
-  // foreign page could fire-and-forget a POST and we'd happily proxy it.
-  if (origin && !isAllowedCrossOrigin && !SAFE_METHODS.has(req.method)) {
+  // Reject cross-origin state-changing requests. Without this, a foreign
+  // page could fire-and-forget a POST and we'd happily proxy it.
+  if (!SAFE_METHODS.has(req.method) && !sameOrigin && !isAllowedCrossOrigin) {
     return res.status(403).json({ error: 'Cross-origin request not allowed' });
   }
 
