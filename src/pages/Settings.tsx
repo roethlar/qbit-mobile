@@ -47,22 +47,28 @@ export function Settings({ onBack }: SettingsProps) {
     }
   };
 
-  const isDirty = preferences !== null && draft !== null &&
-    (draft.dl_limit_kbps !== Math.round((preferences.dl_limit || 0) / 1024) ||
-     draft.up_limit_kbps !== Math.round((preferences.up_limit || 0) / 1024) ||
-     draft.save_path !== (preferences.save_path || ''));
+  // Compute only the fields that actually changed so we don't clobber the
+  // server's higher-precision byte values when the user only edited save_path.
+  const buildChangeSet = (): Partial<Preferences> => {
+    if (!draft || !preferences) return {};
+    const changes: Partial<Preferences> = {};
+    const currentDlKbps = Math.round((preferences.dl_limit || 0) / 1024);
+    const currentUpKbps = Math.round((preferences.up_limit || 0) / 1024);
+    if (draft.dl_limit_kbps !== currentDlKbps) changes.dl_limit = draft.dl_limit_kbps * 1024;
+    if (draft.up_limit_kbps !== currentUpKbps) changes.up_limit = draft.up_limit_kbps * 1024;
+    if (draft.save_path !== (preferences.save_path || '')) changes.save_path = draft.save_path;
+    return changes;
+  };
+
+  const isDirty = Object.keys(buildChangeSet()).length > 0;
 
   const handleSave = async () => {
-    if (!draft || !preferences) return;
+    const changes = buildChangeSet();
+    if (Object.keys(changes).length === 0) return;
     try {
       setSaving(true);
-      const newPrefs: Partial<Preferences> = {
-        dl_limit: draft.dl_limit_kbps * 1024,
-        up_limit: draft.up_limit_kbps * 1024,
-        save_path: draft.save_path,
-      };
-      await apiSetPreferences(newPrefs);
-      setPreferences(prev => prev ? { ...prev, ...newPrefs } : null);
+      await apiSetPreferences(changes);
+      setPreferences(prev => prev ? { ...prev, ...changes } : null);
       setSaveMessage('Settings saved successfully!');
       setTimeout(() => setSaveMessage(null), 3000);
     } catch (error) {

@@ -16,20 +16,35 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// CORS: only allow same-origin or explicit ALLOWED_ORIGIN env var.
-// Wildcard CORS would let any browser-loaded page drive qBittorrent.
+// CORS + CSRF protection: same-origin requests have no Origin header (or
+// match the host). Cross-origin browser requests have Origin set; only the
+// configured ALLOWED_ORIGIN may proceed for state-changing methods.
+// This protects against drive-by attacks since the proxy injects an
+// authenticated qBittorrent cookie on every forwarded request.
 const allowedOrigin = process.env.ALLOWED_ORIGIN || '';
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
 app.use('/api', (req, res, next) => {
   const origin = req.headers.origin;
-  if (allowedOrigin && origin === allowedOrigin) {
+  const isAllowedCrossOrigin = allowedOrigin && origin === allowedOrigin;
+
+  if (isAllowedCrossOrigin) {
     res.header('Access-Control-Allow-Origin', allowedOrigin);
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Content-Type');
     res.header('Vary', 'Origin');
   }
+
   if (req.method === 'OPTIONS') {
-    return res.sendStatus(allowedOrigin && origin === allowedOrigin ? 200 : 403);
+    return res.sendStatus(isAllowedCrossOrigin ? 200 : 403);
   }
+
+  // Reject cross-origin state-changing requests outright. Without this, a
+  // foreign page could fire-and-forget a POST and we'd happily proxy it.
+  if (origin && !isAllowedCrossOrigin && !SAFE_METHODS.has(req.method)) {
+    return res.status(403).json({ error: 'Cross-origin request not allowed' });
+  }
+
   next();
 });
 

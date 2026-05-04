@@ -11,7 +11,20 @@ const upload = multer({
   },
 });
 
-router.post('/torrents/add', upload.any(), async (req, res) => {
+// Wrap multer so its errors (e.g. LIMIT_FILE_SIZE) return a clean JSON
+// response instead of falling through to Express' default error handler.
+const uploadAny = (req, res, next) => {
+  upload.any()(req, res, err => {
+    if (!err) return next();
+    if (err instanceof multer.MulterError) {
+      const status = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+      return res.status(status).json({ error: err.message, code: err.code });
+    }
+    return res.status(400).json({ error: err.message || 'Upload failed' });
+  });
+};
+
+router.post('/torrents/add', uploadAny, async (req, res) => {
   try {
     const FormData = (await import('form-data')).default;
     const formData = new FormData();
