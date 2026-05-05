@@ -362,8 +362,18 @@ if systemctl is-active --quiet "${SERVICE_NAME}"; then
     print_msg "  View logs: journalctl -u ${SERVICE_NAME} -f"
     print_msg "  Restart service: systemctl restart ${SERVICE_NAME}"
     print_msg ""
+    # Resolve a non-loopback IPv4 for the access URL. Fall back gracefully
+    # since 'hostname' isn't installed on every distro.
+    HOST_IP=""
+    if command -v hostname >/dev/null 2>&1; then
+        HOST_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+    fi
+    if [ -z "${HOST_IP}" ] && command -v ip >/dev/null 2>&1; then
+        HOST_IP=$(ip -4 -o addr show scope global 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -n1)
+    fi
+    HOST_IP="${HOST_IP:-localhost}"
     print_msg "Access the web interface at:"
-    print_msg "  http://$(hostname -I | awk '{print $1}'):${ENV_PORT}"
+    print_msg "  http://${HOST_IP}:${ENV_PORT}"
     print_msg "========================================="
 else
     print_error "Service failed to start. Check logs with: journalctl -u ${SERVICE_NAME} -n 50"
