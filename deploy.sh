@@ -18,6 +18,12 @@ SERVICE_NAME="qbit-mobile"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 ENV_FILE="${APP_DIR}/.env"
 
+# Detect existing service user so reinstalls don't re-prompt for it.
+EXISTING_SERVICE_USER=""
+if [ -f "${SERVICE_FILE}" ]; then
+    EXISTING_SERVICE_USER=$(grep -oP '^User=\K\S+' "${SERVICE_FILE}" 2>/dev/null || true)
+fi
+
 # Function to print colored messages
 print_msg() {
     echo -e "${GREEN}[+]${NC} $1"
@@ -63,6 +69,11 @@ mkdir -p "${APP_DIR}"
 # Copy only necessary files for deployment
 print_msg "Copying application files..."
 
+# Wipe directories that may contain files removed since the last release so
+# reinstalls don't keep stale source around. .env, node_modules, and dist
+# are intentionally preserved.
+rm -rf "${APP_DIR}/server" "${APP_DIR}/src" "${APP_DIR}/public"
+
 # Copy runtime files
 cp -r server/ "${APP_DIR}/"
 cp package.json "${APP_DIR}/"
@@ -98,12 +109,22 @@ print_msg "Cleaning up dev dependencies..."
 npm ci --production || npm install --production
 
 # Service user configuration
+# On reinstall, default to whatever the existing service uses.
+case "${EXISTING_SERVICE_USER}" in
+    qbitmobile) DEFAULT_USER_CHOICE=2 ;;
+    nobody|"")  DEFAULT_USER_CHOICE=1 ;;
+    *)          DEFAULT_USER_CHOICE=1 ;;
+esac
+
 print_msg "Service user configuration:"
 echo "1) nobody (minimal permissions, recommended for local use)"
 echo "2) custom user (creates dedicated user account)"
+if [ -n "${EXISTING_SERVICE_USER}" ]; then
+    print_msg "Existing service runs as: ${EXISTING_SERVICE_USER} (default: ${DEFAULT_USER_CHOICE})"
+fi
 while true; do
-    read -r -p "Choose service user type [1]: " user_choice
-    case ${user_choice:-1} in
+    read -r -p "Choose service user type [${DEFAULT_USER_CHOICE}]: " user_choice
+    case ${user_choice:-${DEFAULT_USER_CHOICE}} in
         1)
             SERVICE_USER="nobody"
             SERVICE_GROUP="nobody"
@@ -327,11 +348,14 @@ if systemctl is-active --quiet "${SERVICE_NAME}"; then
     print_msg "========================================="
     print_msg "qBit Mobile has been deployed successfully!"
     print_msg ""
+    ENV_QB_HOST=$(grep ^QBITTORRENT_HOST= "${ENV_FILE}" | cut -d= -f2- 2>/dev/null || echo "localhost")
+    ENV_QB_PORT=$(grep ^QBITTORRENT_PORT= "${ENV_FILE}" | cut -d= -f2- 2>/dev/null || echo "8080")
+    ENV_PORT=$(grep ^PORT= "${ENV_FILE}" | cut -d= -f2- 2>/dev/null || echo "3000")
     print_msg "Configuration:"
     print_msg "  Service user: ${SERVICE_USER}"
-    print_msg "  Web UI port: $(grep ^PORT= "${ENV_FILE}" | cut -d= -f2 2>/dev/null || echo "3000")"
-    print_msg "  qBittorrent: ${qbHost:-localhost}:$(grep ^QBITTORRENT_PORT= "${ENV_FILE}" | cut -d= -f2 2>/dev/null || echo "8080")"
-    print_msg "  Auth mode: $(if grep -q "^QBITTORRENT_USERNAME=.$" "${ENV_FILE}" 2>/dev/null; then echo "Username/Password"; else echo "Local bypass"; fi)"
+    print_msg "  Web UI port: ${ENV_PORT}"
+    print_msg "  qBittorrent: ${ENV_QB_HOST}:${ENV_QB_PORT}"
+    print_msg "  Auth mode: $(if grep -qE '^QBITTORRENT_USERNAME=.+$' "${ENV_FILE}" 2>/dev/null; then echo "Username/Password"; else echo "Local bypass"; fi)"
     print_msg ""
     print_msg "Management commands:"
     print_msg "  Service status: systemctl status ${SERVICE_NAME}"
@@ -339,7 +363,7 @@ if systemctl is-active --quiet "${SERVICE_NAME}"; then
     print_msg "  Restart service: systemctl restart ${SERVICE_NAME}"
     print_msg ""
     print_msg "Access the web interface at:"
-    print_msg "  http://$(hostname -I | awk '{print $1}'):$(grep ^PORT= "${ENV_FILE}" | cut -d= -f2 2>/dev/null || echo "3000")"
+    print_msg "  http://$(hostname -I | awk '{print $1}'):${ENV_PORT}"
     print_msg "========================================="
 else
     print_error "Service failed to start. Check logs with: journalctl -u ${SERVICE_NAME} -n 50"
