@@ -10,6 +10,7 @@ import {
   makeQbRequest,
   initialLogin,
   getQbApiCapabilities,
+  confirmLegacyMode,
   qbHost,
   qbPort,
 } from './qbClient.js';
@@ -156,6 +157,15 @@ function rewritePostPath(p) {
   return p;
 }
 
+// Inverse of rewritePostPath: given a qB5 path, return the qB4 alias if any.
+// Used by the 404-fallback retry — covers the race where the very first
+// request lands before the async capability probe finishes.
+function legacyAliasOf(p) {
+  if (p === '/torrents/stop') return '/torrents/pause';
+  if (p === '/torrents/start') return '/torrents/resume';
+  return null;
+}
+
 function forwardError(res, error, label) {
   if (error.response) {
     console.error(
@@ -186,12 +196,24 @@ async function proxyFormPost(req, res, qbPath) {
       data = new URLSearchParams(data).toString();
     }
     const headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
-    const response = await makeQbRequest(
-      'POST',
-      rewritePostPath(qbPath),
-      data,
-      headers,
-    );
+    const primaryPath = rewritePostPath(qbPath);
+    let response = await makeQbRequest('POST', primaryPath, data, headers);
+
+    // qB4 returns 404 on /torrents/stop and /torrents/start because those
+    // endpoints don't exist on the older API. If we hit that while still
+    // assuming a modern upstream, try the legacy alias and remember the
+    // result so future requests route correctly without the round-trip.
+    if (response.status === 404) {
+      const alias = legacyAliasOf(qbPath);
+      if (alias && primaryPath !== alias) {
+        console.warn(`[proxy] POST ${qbPath} -> 404; retrying as ${alias}`);
+        response = await makeQbRequest('POST', alias, data, headers);
+        if (response.status >= 200 && response.status < 300) {
+          confirmLegacyMode();
+        }
+      }
+    }
+
     res.status(response.status).send(response.data);
   } catch (error) {
     forwardError(res, error, `POST ${qbPath}`);

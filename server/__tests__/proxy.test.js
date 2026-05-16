@@ -311,6 +311,59 @@ describe('CSRF / cross-origin', () => {
   });
 });
 
+describe('qB4 404 fallback for stop/start', () => {
+  const VALID_HASH = 'e'.repeat(40);
+
+  it('retries /torrents/stop as /torrents/pause when upstream returns 404', async () => {
+    axiosMock.mockImplementation(async (config) => {
+      if (config.url.includes('/torrents/stop')) {
+        return { status: 404, data: 'not found', headers: {} };
+      }
+      if (config.url.includes('/torrents/pause')) {
+        return { status: 200, data: '', headers: {} };
+      }
+      return { status: 200, data: [], headers: {} };
+    });
+    const res = await request(app)
+      .post('/api/v2/torrents/stop')
+      .auth(...CREDS)
+      .send(`hashes=${VALID_HASH}`);
+    expect(res.status).toBe(200);
+    const calls = axiosMock.mock.calls.map((c) => c[0].url);
+    expect(calls.some((u) => u.endsWith('/torrents/stop'))).toBe(true);
+    expect(calls.some((u) => u.endsWith('/torrents/pause'))).toBe(true);
+  });
+
+  it('retries /torrents/start as /torrents/resume on 404', async () => {
+    axiosMock.mockImplementation(async (config) => {
+      if (config.url.includes('/torrents/start')) {
+        return { status: 404, data: 'not found', headers: {} };
+      }
+      if (config.url.includes('/torrents/resume')) {
+        return { status: 200, data: '', headers: {} };
+      }
+      return { status: 200, data: [], headers: {} };
+    });
+    const res = await request(app)
+      .post('/api/v2/torrents/start')
+      .auth(...CREDS)
+      .send(`hashes=${VALID_HASH}`);
+    expect(res.status).toBe(200);
+  });
+
+  it('does not retry /torrents/delete on 404', async () => {
+    axiosMock.mockImplementation(async () => ({ status: 404, data: '', headers: {} }));
+    const res = await request(app)
+      .post('/api/v2/torrents/delete')
+      .auth(...CREDS)
+      .send(`hashes=${VALID_HASH}`);
+    expect(res.status).toBe(404);
+    const calls = axiosMock.mock.calls.map((c) => c[0].url);
+    // No /erase, /pause, /resume etc — delete has no legacy alias.
+    expect(calls.filter((u) => u.includes('/torrents/'))).toHaveLength(1);
+  });
+});
+
 describe('upstream 401 re-login', () => {
   it('refreshes the session and retries when upstream returns 401', async () => {
     let n = 0;

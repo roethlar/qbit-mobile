@@ -120,6 +120,16 @@ export function getQbApiVersion() {
   return qbApiVersion;
 }
 
+// Set when a 404 fallback proves the upstream is on the legacy /pause and
+// /resume endpoints. Subsequent requests skip the wrong-path round-trip.
+export function confirmLegacyMode() {
+  if (!qbApiCapabilities.legacy) {
+    qbApiCapabilities.legacy = true;
+    capsDetected = true;
+    console.log('qBittorrent capabilities: legacy pause/resume mode (confirmed via 404 fallback)');
+  }
+}
+
 // `dataOrFactory` may be a value (string/Buffer/URLSearchParams) OR a
 // thunk returning `{ data, headers }`. Use the thunk form for one-shot
 // streams like multipart FormData so we can rebuild after a 401 retry.

@@ -112,9 +112,24 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
     searchQuery, setSearchQuery,
     sortBy, sortOrder, handleSort,
     selectedTag, setSelectedTag,
-    availableTags,
     filteredAndSortedTorrents: visibleTorrents,
   } = useTorrentFilters(filteredTorrents);
+
+  // Tag list is computed from the *raw* torrent set so the tag UI doesn't
+  // disappear when the top-bar filter happens to exclude every tagged
+  // torrent. A persisted selectedTag stays clearable even when no current
+  // torrent carries it.
+  const availableTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    for (const t of torrents) {
+      if (!t.tags) continue;
+      for (const raw of t.tags.split(',')) {
+        const trimmed = raw.trim();
+        if (trimmed) tagSet.add(trimmed);
+      }
+    }
+    return Array.from(tagSet).sort();
+  }, [torrents]);
 
   const handleRefresh = async () => {
     await refetch();

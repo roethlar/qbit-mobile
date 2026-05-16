@@ -139,7 +139,7 @@ export function CompactTorrentList({
             {visibleTorrents.length}/{unfilteredCount}
           </span>
           <div className="flex items-center">
-            {availableTags.length > 0 && (
+            {(availableTags.length > 0 || selectedTag) && (
               <button
                 onClick={() => setShowTags(!showTags)}
                 aria-label="Filter by tag"
@@ -203,8 +203,13 @@ export function CompactTorrentList({
           </div>
         )}
 
-        {showTags && availableTags.length > 0 && (
+        {showTags && (availableTags.length > 0 || selectedTag) && (
           <div className="mt-1 p-2 bg-gray-50 dark:bg-gray-800 rounded">
+            {selectedTag && !availableTags.includes(selectedTag) && (
+              <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-1">
+                No torrents currently carry the tag "{selectedTag}".
+              </p>
+            )}
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs font-medium text-gray-600">Tags</span>
               {selectedTag && (
