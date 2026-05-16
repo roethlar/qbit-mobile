@@ -28,9 +28,20 @@ app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 // AUTH_MODE=basic (default): HTTP Basic auth on /api/*.
 // AUTH_MODE=disabled: no app auth. Intended for trusted-LAN deployments
 // where the user accepts that anyone on the network can drive qBittorrent.
+const VALID_AUTH_MODES = new Set(['basic', 'disabled']);
 const AUTH_MODE = (process.env.AUTH_MODE || 'basic').toLowerCase();
 const APP_USERNAME = process.env.APP_USERNAME || '';
 const APP_PASSWORD = process.env.APP_PASSWORD || '';
+
+if (!VALID_AUTH_MODES.has(AUTH_MODE)) {
+  // Fail closed on typos like AUTH_MODE=basci. Without this, an unrecognized
+  // value would silently bypass the `AUTH_MODE === 'basic'` check below.
+  console.error(
+    `[fatal] Unknown AUTH_MODE=${JSON.stringify(process.env.AUTH_MODE)}. ` +
+      'Must be one of: basic, disabled.',
+  );
+  process.exit(1);
+}
 
 if (AUTH_MODE === 'basic' && (!APP_USERNAME || !APP_PASSWORD)) {
   console.error(
@@ -187,6 +198,36 @@ async function proxyFormPost(req, res, qbPath) {
   }
 }
 
+// qBittorrent accepts hashes as a "|"-separated list of 40-char (SHA-1) or
+// 64-char (BitTorrent v2) hex strings, plus the literal "all" for mass ops.
+// We require an explicit list — "all" is rejected so a buggy or compromised
+// client can't accidentally wipe every torrent through /torrents/delete.
+const HASH_RE = /^[a-f0-9]{40}([a-f0-9]{24})?$/i;
+function validateHashes(req, res, { allowAll }) {
+  const hashes = req.body && req.body.hashes;
+  if (typeof hashes !== 'string' || hashes.length === 0) {
+    res.status(400).json({ error: 'Missing or invalid "hashes" field' });
+    return false;
+  }
+  if (hashes === 'all') {
+    if (allowAll) return true;
+    res.status(400).json({ error: 'Bulk "hashes=all" not permitted on this endpoint' });
+    return false;
+  }
+  const parts = hashes.split('|');
+  if (parts.length > 200) {
+    res.status(400).json({ error: 'Too many hashes in a single request' });
+    return false;
+  }
+  for (const part of parts) {
+    if (!HASH_RE.test(part)) {
+      res.status(400).json({ error: 'Malformed hash in "hashes" field' });
+      return false;
+    }
+  }
+  return true;
+}
+
 // Read endpoints
 app.get('/api/v2/torrents/info', (req, res) => proxyGet(req, res, '/torrents/info'));
 app.get('/api/v2/transfer/info', (req, res) => proxyGet(req, res, '/transfer/info'));
@@ -194,10 +235,20 @@ app.get('/api/v2/app/preferences', (req, res) => proxyGet(req, res, '/app/prefer
 app.get('/api/v2/app/version', (req, res) => proxyGet(req, res, '/app/version'));
 app.get('/api/v2/app/webapiVersion', (req, res) => proxyGet(req, res, '/app/webapiVersion'));
 
-// Torrent state changes
-app.post('/api/v2/torrents/stop', (req, res) => proxyFormPost(req, res, '/torrents/stop'));
-app.post('/api/v2/torrents/start', (req, res) => proxyFormPost(req, res, '/torrents/start'));
-app.post('/api/v2/torrents/delete', (req, res) => proxyFormPost(req, res, '/torrents/delete'));
+// Torrent state changes. stop/start tolerate hashes=all (non-destructive
+// bulk ops are a legitimate use case); delete does not.
+app.post('/api/v2/torrents/stop', (req, res) => {
+  if (!validateHashes(req, res, { allowAll: true })) return;
+  proxyFormPost(req, res, '/torrents/stop');
+});
+app.post('/api/v2/torrents/start', (req, res) => {
+  if (!validateHashes(req, res, { allowAll: true })) return;
+  proxyFormPost(req, res, '/torrents/start');
+});
+app.post('/api/v2/torrents/delete', (req, res) => {
+  if (!validateHashes(req, res, { allowAll: false })) return;
+  proxyFormPost(req, res, '/torrents/delete');
+});
 
 // Torrent upload (multipart) — handled by dedicated router.
 app.use('/api/v2', torrentsRouter);

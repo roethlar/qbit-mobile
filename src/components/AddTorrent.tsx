@@ -92,10 +92,11 @@ export function AddTorrent({ isOpen, onClose, onAddUrl, onAddFile }: AddTorrentP
     <BottomSheet isOpen={isOpen} onClose={handleClose}>
       <div className="p-4">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold text-gray-900">Add Torrent</h2>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Add Torrent</h2>
           <button
             onClick={handleClose}
-            className="p-2 -mr-2 text-gray-400 hover:text-gray-600"
+            aria-label="Close"
+            className="p-2 -mr-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
           >
             <X className="w-5 h-5" />
           </button>
@@ -107,7 +108,7 @@ export function AddTorrent({ isOpen, onClose, onAddUrl, onAddFile }: AddTorrentP
             className={`flex-1 py-2 px-4 text-center font-medium rounded-l-xl border-2 transition-colors ${
               activeTab === 'url'
                 ? 'bg-primary-600 text-white border-primary-600'
-                : 'bg-gray-100 text-gray-600 border-gray-200'
+                : 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600'
             }`}
           >
             <Link className="w-4 h-4 inline-block mr-2" />
@@ -118,7 +119,7 @@ export function AddTorrent({ isOpen, onClose, onAddUrl, onAddFile }: AddTorrentP
             className={`flex-1 py-2 px-4 text-center font-medium rounded-r-xl border-2 border-l-0 transition-colors ${
               activeTab === 'file'
                 ? 'bg-primary-600 text-white border-primary-600'
-                : 'bg-gray-100 text-gray-600 border-gray-200'
+                : 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600'
             }`}
           >
             <Upload className="w-4 h-4 inline-block mr-2" />
@@ -127,15 +128,15 @@ export function AddTorrent({ isOpen, onClose, onAddUrl, onAddFile }: AddTorrentP
         </div>
 
         {submitError && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl">
-            <p className="text-red-800 text-sm font-medium">{submitError}</p>
+          <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
+            <p className="text-red-800 dark:text-red-300 text-sm font-medium">{submitError}</p>
           </div>
         )}
 
         {activeTab === 'url' ? (
           <form onSubmit={handleSubmitUrl} className="space-y-4">
             <div>
-              <label htmlFor="url" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="url" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Torrent URL or Magnet Link
               </label>
               <textarea
@@ -143,7 +144,7 @@ export function AddTorrent({ isOpen, onClose, onAddUrl, onAddFile }: AddTorrentP
                 value={url}
                 onChange={(e) => { setUrl(e.target.value); setUrlError(''); }}
                 placeholder="magnet:?xt=urn:btih:... or https://..."
-                className={`w-full p-3 border rounded-xl resize-none text-sm ${urlError ? 'border-red-400' : 'border-gray-300'}`}
+                className={`w-full p-3 border rounded-xl resize-none text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 ${urlError ? 'border-red-400' : 'border-gray-300 dark:border-gray-600'}`}
                 rows={3}
                 required
                 disabled={submitting}
@@ -168,13 +169,13 @@ export function AddTorrent({ isOpen, onClose, onAddUrl, onAddFile }: AddTorrentP
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={submitting}
-              className="w-full p-8 border-2 border-dashed border-gray-300 rounded-xl text-center hover:border-primary-400 transition-colors disabled:opacity-50"
+              className="w-full p-8 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl text-center hover:border-primary-400 transition-colors disabled:opacity-50"
             >
-              <Upload className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-              <p className="text-gray-600 font-medium">
+              <Upload className="w-8 h-8 mx-auto mb-2 text-gray-400 dark:text-gray-500" />
+              <p className="text-gray-600 dark:text-gray-300 font-medium">
                 {submitting ? 'Adding…' : 'Choose .torrent file'}
               </p>
-              <p className="text-sm text-gray-500 mt-1">Tap to browse files</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Tap to browse files</p>
             </button>
             <TorrentOptions options={options} onChange={setOptions} />
           </div>
@@ -196,12 +197,12 @@ function TorrentOptions({ options, onChange }: TorrentOptionsProps) {
 
   return (
     <div className="space-y-4">
-      <div className="border-t border-gray-200 pt-4">
-        <h3 className="text-sm font-medium text-gray-700 mb-3">Options</h3>
+      <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Options</h3>
 
         <div className="space-y-3">
           <div>
-            <label htmlFor="savepath" className="block text-sm text-gray-600 mb-1">
+            <label htmlFor="savepath" className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
               Save Path (optional)
             </label>
             <input
@@ -215,7 +216,7 @@ function TorrentOptions({ options, onChange }: TorrentOptionsProps) {
           </div>
 
           <div>
-            <label htmlFor="category" className="block text-sm text-gray-600 mb-1">
+            <label htmlFor="category" className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
               Category (optional)
             </label>
             <input
@@ -236,7 +237,7 @@ function TorrentOptions({ options, onChange }: TorrentOptionsProps) {
                 onChange={(e) => updateOption('stopped', e.target.checked)}
                 className="mr-3 w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
               />
-              <span className="text-sm text-gray-700">Start stopped</span>
+              <span className="text-sm text-gray-700 dark:text-gray-300">Start stopped</span>
             </label>
 
             <label className="flex items-center">
@@ -246,7 +247,7 @@ function TorrentOptions({ options, onChange }: TorrentOptionsProps) {
                 onChange={(e) => updateOption('skip_checking', e.target.checked)}
                 className="mr-3 w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
               />
-              <span className="text-sm text-gray-700">Skip hash checking</span>
+              <span className="text-sm text-gray-700 dark:text-gray-300">Skip hash checking</span>
             </label>
 
             <label className="flex items-center">
@@ -256,7 +257,7 @@ function TorrentOptions({ options, onChange }: TorrentOptionsProps) {
                 onChange={(e) => updateOption('sequentialDownload', e.target.checked)}
                 className="mr-3 w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
               />
-              <span className="text-sm text-gray-700">Sequential download</span>
+              <span className="text-sm text-gray-700 dark:text-gray-300">Sequential download</span>
             </label>
 
             <label className="flex items-center">
@@ -266,7 +267,7 @@ function TorrentOptions({ options, onChange }: TorrentOptionsProps) {
                 onChange={(e) => updateOption('firstLastPiecePrio', e.target.checked)}
                 className="mr-3 w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
               />
-              <span className="text-sm text-gray-700">First/last piece priority</span>
+              <span className="text-sm text-gray-700 dark:text-gray-300">First/last piece priority</span>
             </label>
           </div>
         </div>

@@ -9,9 +9,11 @@ let sessionCookie = null;
 let loginInFlight = null;
 
 let qbApiVersion = null;
+let capsDetected = false;
 // qBittorrent <5.0 (Web API <2.11) uses /torrents/pause and /resume instead of
-// /stop and /start, and the add-torrent flag is "paused" instead of "stopped".
-// The preference key is "start_paused_enabled" instead of "add_stopped_enabled".
+// /stop and /start. The preference key is "start_paused_enabled" instead of
+// "add_stopped_enabled". (The add-torrent param is normalized to "paused" on
+// both versions in routes/torrents.js since qB 5.x still accepts it.)
 const qbApiCapabilities = { legacy: false };
 
 function buildLoginBody() {
@@ -44,6 +46,7 @@ async function performLogin() {
     const sid = cookies.find(c => /^SID(\d+)?=/.test(c));
     if (sid) {
       sessionCookie = sid.split(';')[0];
+      finalizeLogin();
       return;
     }
   }
@@ -52,10 +55,20 @@ async function performLogin() {
     // Local-bypass mode: no cookie issued, but the upstream will accept us
     // based on the source address.
     sessionCookie = '';
+    finalizeLogin();
     return;
   }
 
   throw new Error('Login response did not include a session cookie');
+}
+
+// Hook for work that should happen after every successful login (not just
+// boot). detectCapabilities goes here so a qB instance that was offline at
+// boot still gets its API version detected the first time we reach it.
+function finalizeLogin() {
+  if (!capsDetected) {
+    detectCapabilities().catch(() => { /* will retry on next login */ });
+  }
 }
 
 function ensureLogin() {
@@ -88,9 +101,14 @@ async function detectCapabilities() {
       qbApiVersion = raw;
       const v = parseVersionTuple(raw);
       qbApiCapabilities.legacy = !!(v && (v[0] < 2 || (v[0] === 2 && v[1] < 11)));
+      capsDetected = true;
+      console.log(
+        `qBittorrent Web API: ${qbApiVersion}` +
+          (qbApiCapabilities.legacy ? ' (legacy pause/resume mode)' : ''),
+      );
     }
   } catch {
-    // Leave capabilities at defaults; upstream may be temporarily unavailable.
+    // Leave capsDetected=false so the next successful login retries.
   }
 }
 
@@ -165,11 +183,7 @@ export async function initialLogin() {
       await ensureLogin();
       console.log('Initial authentication successful');
       console.log(`qBittorrent auth: ${qbUser ? 'Username/Password' : 'Local bypass'}`);
-      await detectCapabilities();
-      if (qbApiVersion) {
-        const tag = qbApiCapabilities.legacy ? ' (legacy pause/resume mode)' : '';
-        console.log(`qBittorrent Web API: ${qbApiVersion}${tag}`);
-      }
+      // detectCapabilities is fired by finalizeLogin and logs its own line.
       return;
     } catch (error) {
       lastError = error;

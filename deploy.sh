@@ -256,12 +256,22 @@ prompt_app_auth() {
     done
 }
 
+escape_env_value() {
+    # Wrap value in double quotes and escape \, ", $ so dotenv reads it
+    # back verbatim regardless of what characters the user pasted.
+    local v="$1"
+    v="${v//\\/\\\\}"
+    v="${v//\"/\\\"}"
+    v="${v//\$/\\\$}"
+    printf '"%s"' "$v"
+}
+
 append_auth_to_env() {
     {
         printf '\n# --- App authentication (added on upgrade) ---\n'
-        printf 'AUTH_MODE=%s\n' "${AUTH_MODE}"
-        printf 'APP_USERNAME=%s\n' "${APP_USER}"
-        printf 'APP_PASSWORD=%s\n' "${APP_PASS}"
+        printf 'AUTH_MODE=%s\n' "$(escape_env_value "${AUTH_MODE}")"
+        printf 'APP_USERNAME=%s\n' "$(escape_env_value "${APP_USER}")"
+        printf 'APP_PASSWORD=%s\n' "$(escape_env_value "${APP_PASS}")"
     } >> "${ENV_FILE}"
 }
 
@@ -276,25 +286,27 @@ write_env_file() {
     local qb_user="$8"
     local qb_pass="$9"
 
-    # Use printf so $-expansion / backticks in values don't get interpreted.
+    # Use printf so $-expansion / backticks in values don't get interpreted,
+    # and quote every value so dotenv parses passwords with # or whitespace
+    # correctly. The escape_env_value helper handles \, ", $ inside the quotes.
     {
         printf '%s\n' '# qBit Mobile Configuration'
         printf '\n'
         printf '%s\n' '# --- App server ---'
-        printf 'NODE_ENV=%s\n' 'production'
-        printf 'PORT=%s\n' "${app_port}"
-        printf 'HOST=%s\n' "${app_host}"
+        printf 'NODE_ENV=%s\n' "$(escape_env_value 'production')"
+        printf 'PORT=%s\n' "$(escape_env_value "${app_port}")"
+        printf 'HOST=%s\n' "$(escape_env_value "${app_host}")"
         printf '\n'
         printf '%s\n' '# --- App authentication ---'
-        printf 'AUTH_MODE=%s\n' "${auth_mode}"
-        printf 'APP_USERNAME=%s\n' "${app_user}"
-        printf 'APP_PASSWORD=%s\n' "${app_pass}"
+        printf 'AUTH_MODE=%s\n' "$(escape_env_value "${auth_mode}")"
+        printf 'APP_USERNAME=%s\n' "$(escape_env_value "${app_user}")"
+        printf 'APP_PASSWORD=%s\n' "$(escape_env_value "${app_pass}")"
         printf '\n'
         printf '%s\n' '# --- Upstream qBittorrent ---'
-        printf 'QBITTORRENT_HOST=%s\n' "${qb_host}"
-        printf 'QBITTORRENT_PORT=%s\n' "${qb_port}"
-        printf 'QBITTORRENT_USERNAME=%s\n' "${qb_user}"
-        printf 'QBITTORRENT_PASSWORD=%s\n' "${qb_pass}"
+        printf 'QBITTORRENT_HOST=%s\n' "$(escape_env_value "${qb_host}")"
+        printf 'QBITTORRENT_PORT=%s\n' "$(escape_env_value "${qb_port}")"
+        printf 'QBITTORRENT_USERNAME=%s\n' "$(escape_env_value "${qb_user}")"
+        printf 'QBITTORRENT_PASSWORD=%s\n' "$(escape_env_value "${qb_pass}")"
     } > "${ENV_FILE}"
 }
 

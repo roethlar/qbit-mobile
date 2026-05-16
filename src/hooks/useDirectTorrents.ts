@@ -16,15 +16,25 @@ function optimisticResumedState(state: TorrentState): TorrentState {
   return state.endsWith('UP') ? 'uploading' : 'downloading';
 }
 
-interface TorrentsSnapshot {
-  previous?: Torrent[];
+// Per-hash snapshot so concurrent mutations don't trample each other.
+// A full-list rollback would undo other optimistic updates that were still
+// in flight when this mutation failed.
+interface HashSnapshot {
+  hash: string;
+  previous: Torrent | null;
 }
+
+// While healthy we poll every 5s. While the upstream is failing we back off
+// to 30s so the UI still self-recovers when the server comes back — but
+// without hammering the server during an outage.
+const POLL_OK_MS = 5_000;
+const POLL_ERROR_MS = 30_000;
 
 export function useDirectTorrents() {
   return useQuery({
     queryKey: TORRENTS_KEY,
     queryFn: api.getTorrents,
-    refetchInterval: (q) => (q.state.error ? false : 5000),
+    refetchInterval: (q) => (q.state.error ? POLL_ERROR_MS : POLL_OK_MS),
     refetchOnReconnect: true,
     staleTime: 3000,
     placeholderData: (previousData) => previousData,
@@ -36,7 +46,7 @@ export function useDirectGlobalStats() {
   return useQuery({
     queryKey: GLOBAL_STATS_KEY,
     queryFn: api.getGlobalStats,
-    refetchInterval: (q) => (q.state.error ? false : 5000),
+    refetchInterval: (q) => (q.state.error ? POLL_ERROR_MS : POLL_OK_MS),
     refetchOnReconnect: true,
     staleTime: 3000,
     placeholderData: (previousData) => previousData,
@@ -47,9 +57,10 @@ export function useDirectGlobalStats() {
 export function useDirectTorrentActions() {
   const queryClient = useQueryClient();
 
-  async function snapshot(): Promise<TorrentsSnapshot> {
+  async function snapshotHash(hash: string): Promise<HashSnapshot> {
     await queryClient.cancelQueries({ queryKey: TORRENTS_KEY });
-    return { previous: queryClient.getQueryData<Torrent[]>(TORRENTS_KEY) };
+    const list = queryClient.getQueryData<Torrent[]>(TORRENTS_KEY) ?? [];
+    return { hash, previous: list.find((t) => t.hash === hash) ?? null };
   }
 
   function patch(updater: (list: Torrent[]) => Torrent[]) {
@@ -58,14 +69,24 @@ export function useDirectTorrentActions() {
     );
   }
 
-  function rollback(ctx: TorrentsSnapshot | undefined) {
-    if (ctx?.previous) queryClient.setQueryData(TORRENTS_KEY, ctx.previous);
+  function revertHash(ctx: HashSnapshot | undefined) {
+    if (!ctx) return;
+    const restore = ctx.previous;
+    patch((list) => {
+      if (restore) {
+        const hasIt = list.some((t) => t.hash === restore.hash);
+        return hasIt
+          ? list.map((t) => (t.hash === restore.hash ? restore : t))
+          : [...list, restore];
+      }
+      return list.filter((t) => t.hash !== ctx.hash);
+    });
   }
 
-  const pauseTorrent = useMutation<unknown, Error, string, TorrentsSnapshot>({
+  const pauseTorrent = useMutation<unknown, Error, string, HashSnapshot>({
     mutationFn: (hash) => api.pauseTorrent(hash),
     onMutate: async (hash) => {
-      const snap = await snapshot();
+      const snap = await snapshotHash(hash);
       patch((list) =>
         list.map((t) =>
           t.hash === hash ? { ...t, state: optimisticPausedState(t.state) } : t,
@@ -73,16 +94,16 @@ export function useDirectTorrentActions() {
       );
       return snap;
     },
-    onError: (_err, _hash, ctx) => rollback(ctx),
+    onError: (_err, _hash, ctx) => revertHash(ctx),
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: TORRENTS_KEY });
     },
   });
 
-  const resumeTorrent = useMutation<unknown, Error, string, TorrentsSnapshot>({
+  const resumeTorrent = useMutation<unknown, Error, string, HashSnapshot>({
     mutationFn: (hash) => api.resumeTorrent(hash),
     onMutate: async (hash) => {
-      const snap = await snapshot();
+      const snap = await snapshotHash(hash);
       patch((list) =>
         list.map((t) =>
           t.hash === hash ? { ...t, state: optimisticResumedState(t.state) } : t,
@@ -90,7 +111,7 @@ export function useDirectTorrentActions() {
       );
       return snap;
     },
-    onError: (_err, _hash, ctx) => rollback(ctx),
+    onError: (_err, _hash, ctx) => revertHash(ctx),
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: TORRENTS_KEY });
     },
@@ -100,15 +121,15 @@ export function useDirectTorrentActions() {
     unknown,
     Error,
     { hash: string; deleteFiles?: boolean },
-    TorrentsSnapshot
+    HashSnapshot
   >({
     mutationFn: ({ hash, deleteFiles }) => api.deleteTorrent(hash, deleteFiles),
     onMutate: async ({ hash }) => {
-      const snap = await snapshot();
+      const snap = await snapshotHash(hash);
       patch((list) => list.filter((t) => t.hash !== hash));
       return snap;
     },
-    onError: (_err, _vars, ctx) => rollback(ctx),
+    onError: (_err, _vars, ctx) => revertHash(ctx),
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: TORRENTS_KEY });
       queryClient.invalidateQueries({ queryKey: GLOBAL_STATS_KEY });

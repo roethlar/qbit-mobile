@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Download, Upload, Folder, Pause, Wifi } from 'lucide-react';
 import { Layout, Header } from '../components/Layout';
 import { getPreferences, setPreferences as apiSetPreferences } from '../services/directApi';
@@ -31,10 +31,20 @@ export function Settings({ onBack }: SettingsProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const saveMessageTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     loadPreferences();
+    return () => {
+      if (saveMessageTimerRef.current) clearTimeout(saveMessageTimerRef.current);
+    };
   }, []);
+
+  const flashSaveMessage = (msg: string) => {
+    setSaveMessage(msg);
+    if (saveMessageTimerRef.current) clearTimeout(saveMessageTimerRef.current);
+    saveMessageTimerRef.current = setTimeout(() => setSaveMessage(null), 3000);
+  };
 
   const loadPreferences = async () => {
     try {
@@ -74,12 +84,10 @@ export function Settings({ onBack }: SettingsProps) {
       setSaving(true);
       await apiSetPreferences(changes);
       setPreferences(prev => prev ? { ...prev, ...changes } : null);
-      setSaveMessage('Settings saved successfully!');
-      setTimeout(() => setSaveMessage(null), 3000);
+      flashSaveMessage('Settings saved successfully!');
     } catch (error) {
       console.error('Failed to save preferences:', error);
-      setSaveMessage('Failed to save settings');
-      setTimeout(() => setSaveMessage(null), 3000);
+      flashSaveMessage('Failed to save settings');
     } finally {
       setSaving(false);
     }

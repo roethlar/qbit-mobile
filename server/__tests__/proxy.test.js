@@ -90,12 +90,12 @@ describe('endpoint allowlist', () => {
     const res = await request(app)
       .post('/api/v2/torrents/stop')
       .auth(...CREDS)
-      .send('hashes=abc123');
+      .send('hashes=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
     expect(res.status).toBe(200);
     const call = axiosMock.mock.calls[axiosMock.mock.calls.length - 1][0];
     expect(call.url).toContain('/torrents/stop');
     expect(call.method).toBe('POST');
-    expect(call.data).toContain('hashes=abc123');
+    expect(call.data).toContain('hashes=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
   });
 });
 
@@ -152,13 +152,84 @@ describe('setPreferences key filter', () => {
   });
 });
 
+describe('torrent action hash validation', () => {
+  const VALID_HASH = 'a'.repeat(40);
+  const VALID_V2_HASH = 'b'.repeat(64);
+
+  it('accepts a valid 40-char hash on /torrents/stop', async () => {
+    const res = await request(app)
+      .post('/api/v2/torrents/stop')
+      .auth(...CREDS)
+      .send(`hashes=${VALID_HASH}`);
+    expect(res.status).toBe(200);
+  });
+
+  it('accepts a valid 64-char v2 hash on /torrents/start', async () => {
+    const res = await request(app)
+      .post('/api/v2/torrents/start')
+      .auth(...CREDS)
+      .send(`hashes=${VALID_V2_HASH}`);
+    expect(res.status).toBe(200);
+  });
+
+  it('accepts a pipe-separated list of hashes', async () => {
+    const res = await request(app)
+      .post('/api/v2/torrents/stop')
+      .auth(...CREDS)
+      .send(`hashes=${VALID_HASH}|${VALID_V2_HASH}`);
+    expect(res.status).toBe(200);
+  });
+
+  it('allows hashes=all on /torrents/stop (non-destructive)', async () => {
+    const res = await request(app)
+      .post('/api/v2/torrents/stop')
+      .auth(...CREDS)
+      .send('hashes=all');
+    expect(res.status).toBe(200);
+  });
+
+  it('blocks hashes=all on /torrents/delete', async () => {
+    const res = await request(app)
+      .post('/api/v2/torrents/delete')
+      .auth(...CREDS)
+      .send('hashes=all&deleteFiles=true');
+    expect(res.status).toBe(400);
+    expect(axiosMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects garbage in hashes', async () => {
+    const res = await request(app)
+      .post('/api/v2/torrents/delete')
+      .auth(...CREDS)
+      .send('hashes=not-a-hash');
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects missing hashes field', async () => {
+    const res = await request(app)
+      .post('/api/v2/torrents/delete')
+      .auth(...CREDS)
+      .send('');
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects a too-long hash list', async () => {
+    const lots = Array.from({ length: 201 }, () => VALID_HASH).join('|');
+    const res = await request(app)
+      .post('/api/v2/torrents/stop')
+      .auth(...CREDS)
+      .send(`hashes=${lots}`);
+    expect(res.status).toBe(400);
+  });
+});
+
 describe('CSRF / cross-origin', () => {
   it('rejects cross-origin POST without ALLOWED_ORIGIN', async () => {
     const res = await request(app)
       .post('/api/v2/torrents/stop')
       .set('Origin', 'http://evil.example')
       .auth(...CREDS)
-      .send('hashes=abc');
+      .send('hashes=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
     expect(res.status).toBe(403);
   });
 
@@ -166,7 +237,7 @@ describe('CSRF / cross-origin', () => {
     const res = await request(app)
       .post('/api/v2/torrents/stop')
       .auth(...CREDS)
-      .send('hashes=abc');
+      .send('hashes=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
     expect(res.status).toBe(200);
   });
 });
@@ -188,8 +259,12 @@ describe('upstream 401 re-login', () => {
     const res = await request(app)
       .post('/api/v2/torrents/stop')
       .auth(...CREDS)
-      .send('hashes=abc');
+      .send('hashes=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
     expect(res.status).toBe(200);
-    expect(n).toBe(3);
+    // Initial 401 + /auth/login + retry; capability detection may add
+    // a /app/webapiVersion call after login, so just assert >= 3.
+    expect(n).toBeGreaterThanOrEqual(3);
+    const urls = axiosMock.mock.calls.map((c) => c[0].url);
+    expect(urls.some((u) => u.includes('/auth/login'))).toBe(true);
   });
 });

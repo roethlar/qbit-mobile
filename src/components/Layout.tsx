@@ -140,13 +140,15 @@ export function BottomSheet({ isOpen, onClose, title, children }: BottomSheetPro
 interface FloatingActionButtonProps {
   onClick: () => void;
   icon: ReactNode;
+  ariaLabel: string;
   className?: string;
 }
 
-export function FloatingActionButton({ onClick, icon, className }: FloatingActionButtonProps) {
+export function FloatingActionButton({ onClick, icon, ariaLabel, className }: FloatingActionButtonProps) {
   return (
     <button
       onClick={onClick}
+      aria-label={ariaLabel}
       className={clsx(
         'fixed bottom-6 right-6',
         'w-14 h-14 bg-primary-600 text-white',

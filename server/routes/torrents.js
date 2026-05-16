@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import FormData from 'form-data';
-import { makeQbRequest, getQbApiCapabilities } from '../qbClient.js';
+import { makeQbRequest } from '../qbClient.js';
 
 const router = Router();
 
@@ -41,15 +41,15 @@ const uploadFiles = (req, res, next) => {
 
 function buildAddFormData(body, files) {
   const formData = new FormData();
-  const caps = getQbApiCapabilities();
 
   for (const [key, rawValue] of Object.entries(body || {})) {
     if (!ALLOWED_ADD_FIELDS.has(key)) continue;
     if (rawValue === undefined || rawValue === null || rawValue === '') continue;
     const value = Array.isArray(rawValue) ? rawValue[0] : rawValue;
-    let outKey = key;
-    if (caps.legacy && key === 'stopped') outKey = 'paused';
-    else if (!caps.legacy && key === 'paused') outKey = 'stopped';
+    // The frontend uses qB5's "stopped" name, but qB 4.x and the current qB
+    // 5.x WebUI API both still accept the original "paused" parameter. Send
+    // that to keep behavior consistent across versions.
+    const outKey = key === 'stopped' ? 'paused' : key;
     formData.append(outKey, String(value));
   }
 

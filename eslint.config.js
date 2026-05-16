@@ -44,5 +44,14 @@ export default [
       sourceType: 'module',
       globals: globals.node,
     },
+    rules: {
+      ...js.configs.recommended.rules,
+    },
+  },
+  {
+    files: ['vitest.config.ts', 'test/setup.ts'],
+    languageOptions: {
+      globals: { ...globals.node },
+    },
   },
 ]

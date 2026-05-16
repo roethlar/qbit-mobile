@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { Plus, Settings, RefreshCw, Moon, Sun } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
@@ -31,6 +31,17 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
   const [showAddTorrent, setShowAddTorrent] = useState(false);
   const [filter, setFilter] = useState<string>('all');
   const [addSuccess, setAddSuccess] = useState<string | null>(null);
+  const successTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => () => {
+    if (successTimerRef.current) clearTimeout(successTimerRef.current);
+  }, []);
+
+  const scheduleSuccessDismiss = (msg: string) => {
+    setAddSuccess(msg);
+    if (successTimerRef.current) clearTimeout(successTimerRef.current);
+    successTimerRef.current = setTimeout(() => setAddSuccess(null), 3000);
+  };
 
   const { toggleTheme, isDark } = useTheme();
   const { data: torrents = [], isLoading, isError, refetch } = useDirectTorrents();
@@ -68,8 +79,7 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
     try {
       setAddSuccess(null);
       await addTorrentUrl.mutateAsync({ url, options });
-      setAddSuccess('Torrent added successfully!');
-      setTimeout(() => setAddSuccess(null), 3000);
+      scheduleSuccessDismiss('Torrent added successfully!');
     } catch (error: unknown) {
       console.error('Failed to add torrent:', error);
       throw new Error(extractErrorMessage(error, 'Failed to add torrent'));
@@ -80,8 +90,7 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
     try {
       setAddSuccess(null);
       await addTorrentFile.mutateAsync({ file, options });
-      setAddSuccess('Torrent file added successfully!');
-      setTimeout(() => setAddSuccess(null), 3000);
+      scheduleSuccessDismiss('Torrent file added successfully!');
     } catch (error: unknown) {
       console.error('Failed to add torrent:', error);
       throw new Error(extractErrorMessage(error, 'Failed to add torrent file'));
@@ -147,7 +156,7 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
               className={`flex-shrink-0 px-1.5 py-0.5 rounded text-xs transition-colors ${
                 filter === filterItem.key
                   ? 'bg-primary-600 text-white'
-                  : 'bg-gray-100 text-gray-600 active:bg-gray-200'
+                  : 'bg-gray-100 text-gray-600 active:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:active:bg-gray-600'
               }`}
             >
               {filterItem.label} ({filterItem.count})
@@ -164,13 +173,13 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
       </div>
 
       {isError && (
-        <div className="mx-4 mt-2 mb-2 p-3 bg-red-50 border border-red-200 rounded-xl flex items-center justify-between gap-3">
-          <p className="text-red-800 text-sm font-medium flex-1">
+        <div className="mx-4 mt-2 mb-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl flex items-center justify-between gap-3">
+          <p className="text-red-800 dark:text-red-300 text-sm font-medium flex-1">
             Couldn't reach qBittorrent — retrying…
           </p>
           <button
             onClick={() => refetch()}
-            className="text-red-800 text-xs font-medium underline active:opacity-70"
+            className="text-red-800 dark:text-red-300 text-xs font-medium underline active:opacity-70"
           >
             Retry
           </button>
@@ -178,8 +187,8 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
       )}
 
       {addSuccess && (
-        <div className="mx-4 mb-4 p-3 bg-green-50 border border-green-200 rounded-xl">
-          <p className="text-green-800 text-sm font-medium">{addSuccess}</p>
+        <div className="mx-4 mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl">
+          <p className="text-green-800 dark:text-green-300 text-sm font-medium">{addSuccess}</p>
         </div>
       )}
 
@@ -195,6 +204,7 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
       <FloatingActionButton
         onClick={() => setShowAddTorrent(true)}
         icon={<Plus className="w-6 h-6" />}
+        ariaLabel="Add torrent"
       />
 
       <AddTorrent
