@@ -152,6 +152,75 @@ describe('setPreferences key filter', () => {
   });
 });
 
+describe('per-torrent detail endpoints', () => {
+  const VALID_HASH = 'c'.repeat(40);
+
+  it.each(['/torrents/properties', '/torrents/files', '/torrents/trackers'])(
+    'forwards GET %s with a valid hash',
+    async (path) => {
+      const res = await request(app)
+        .get(`/api/v2${path}?hash=${VALID_HASH}`)
+        .auth(...CREDS);
+      expect(res.status).toBe(200);
+      const call = axiosMock.mock.calls[axiosMock.mock.calls.length - 1][0];
+      expect(call.url).toContain(`${path}?hash=${VALID_HASH}`);
+    },
+  );
+
+  it('rejects missing hash query', async () => {
+    const res = await request(app)
+      .get('/api/v2/torrents/properties')
+      .auth(...CREDS);
+    expect(res.status).toBe(400);
+    expect(axiosMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects malformed hash query', async () => {
+    const res = await request(app)
+      .get('/api/v2/torrents/files?hash=not-a-hash')
+      .auth(...CREDS);
+    expect(res.status).toBe(400);
+  });
+
+  it('strips any extra query params (only forwards validated hash)', async () => {
+    const res = await request(app)
+      .get(`/api/v2/torrents/properties?hash=${VALID_HASH}&extra=foo&another=bar`)
+      .auth(...CREDS);
+    expect(res.status).toBe(200);
+    const call = axiosMock.mock.calls[axiosMock.mock.calls.length - 1][0];
+    expect(call.url).not.toContain('extra');
+    expect(call.url).not.toContain('another');
+  });
+});
+
+describe('recheck and reannounce', () => {
+  const VALID_HASH = 'd'.repeat(40);
+
+  it('forwards POST /torrents/recheck with a valid hash', async () => {
+    const res = await request(app)
+      .post('/api/v2/torrents/recheck')
+      .auth(...CREDS)
+      .send(`hashes=${VALID_HASH}`);
+    expect(res.status).toBe(200);
+  });
+
+  it('forwards POST /torrents/reannounce with a valid hash', async () => {
+    const res = await request(app)
+      .post('/api/v2/torrents/reannounce')
+      .auth(...CREDS)
+      .send(`hashes=${VALID_HASH}`);
+    expect(res.status).toBe(200);
+  });
+
+  it('rejects hashes=all on /torrents/recheck (destructive-ish)', async () => {
+    const res = await request(app)
+      .post('/api/v2/torrents/recheck')
+      .auth(...CREDS)
+      .send('hashes=all');
+    expect(res.status).toBe(400);
+  });
+});
+
 describe('torrent action hash validation', () => {
   const VALID_HASH = 'a'.repeat(40);
   const VALID_V2_HASH = 'b'.repeat(64);

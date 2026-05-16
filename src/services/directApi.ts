@@ -1,5 +1,12 @@
 import axios from 'axios';
-import type { Torrent, GlobalTransferInfo, Preferences } from '../types/qbittorrent';
+import type {
+  Torrent,
+  GlobalTransferInfo,
+  Preferences,
+  TorrentProperties,
+  TorrentFile,
+  TorrentTracker,
+} from '../types/qbittorrent';
 
 const api = axios.create({
   baseURL: `/api/v2`,
@@ -81,4 +88,27 @@ export async function setPreferences(prefs: Partial<Preferences>): Promise<void>
     '/app/setPreferences',
     new URLSearchParams({ json: JSON.stringify(prefs) })
   );
+}
+
+export async function getTorrentProperties(hash: string): Promise<TorrentProperties> {
+  const response = await api.get('/torrents/properties', { params: { hash } });
+  return response.data;
+}
+
+export async function getTorrentFiles(hash: string): Promise<TorrentFile[]> {
+  const response = await api.get('/torrents/files', { params: { hash } });
+  return response.data || [];
+}
+
+export async function getTorrentTrackers(hash: string): Promise<TorrentTracker[]> {
+  const response = await api.get('/torrents/trackers', { params: { hash } });
+  return response.data || [];
+}
+
+export async function recheckTorrent(hash: string): Promise<void> {
+  await api.post('/torrents/recheck', new URLSearchParams({ hashes: hash }));
+}
+
+export async function reannounceTorrent(hash: string): Promise<void> {
+  await api.post('/torrents/reannounce', new URLSearchParams({ hashes: hash }));
 }

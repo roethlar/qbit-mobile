@@ -228,12 +228,40 @@ function validateHashes(req, res, { allowAll }) {
   return true;
 }
 
-// Read endpoints
+// Per-torrent GETs take a single hash in the query string. We forward only
+// that one validated param so callers can't slip extra query keys past us.
+function takeHashQuery(req, res) {
+  const hash = req.query && req.query.hash;
+  if (typeof hash !== 'string' || !HASH_RE.test(hash)) {
+    res.status(400).json({ error: 'Missing or invalid "hash" query param' });
+    return null;
+  }
+  return hash;
+}
+
+// Read endpoints (no per-torrent params)
 app.get('/api/v2/torrents/info', (req, res) => proxyGet(req, res, '/torrents/info'));
 app.get('/api/v2/transfer/info', (req, res) => proxyGet(req, res, '/transfer/info'));
 app.get('/api/v2/app/preferences', (req, res) => proxyGet(req, res, '/app/preferences'));
 app.get('/api/v2/app/version', (req, res) => proxyGet(req, res, '/app/version'));
 app.get('/api/v2/app/webapiVersion', (req, res) => proxyGet(req, res, '/app/webapiVersion'));
+
+// Per-torrent detail reads
+app.get('/api/v2/torrents/properties', (req, res) => {
+  const hash = takeHashQuery(req, res);
+  if (!hash) return;
+  proxyGet(req, res, `/torrents/properties?hash=${encodeURIComponent(hash)}`);
+});
+app.get('/api/v2/torrents/files', (req, res) => {
+  const hash = takeHashQuery(req, res);
+  if (!hash) return;
+  proxyGet(req, res, `/torrents/files?hash=${encodeURIComponent(hash)}`);
+});
+app.get('/api/v2/torrents/trackers', (req, res) => {
+  const hash = takeHashQuery(req, res);
+  if (!hash) return;
+  proxyGet(req, res, `/torrents/trackers?hash=${encodeURIComponent(hash)}`);
+});
 
 // Torrent state changes. stop/start tolerate hashes=all (non-destructive
 // bulk ops are a legitimate use case); delete does not.
@@ -248,6 +276,14 @@ app.post('/api/v2/torrents/start', (req, res) => {
 app.post('/api/v2/torrents/delete', (req, res) => {
   if (!validateHashes(req, res, { allowAll: false })) return;
   proxyFormPost(req, res, '/torrents/delete');
+});
+app.post('/api/v2/torrents/recheck', (req, res) => {
+  if (!validateHashes(req, res, { allowAll: false })) return;
+  proxyFormPost(req, res, '/torrents/recheck');
+});
+app.post('/api/v2/torrents/reannounce', (req, res) => {
+  if (!validateHashes(req, res, { allowAll: false })) return;
+  proxyFormPost(req, res, '/torrents/reannounce');
 });
 
 // Torrent upload (multipart) — handled by dedicated router.

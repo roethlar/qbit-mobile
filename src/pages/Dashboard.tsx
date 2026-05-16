@@ -5,6 +5,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { Layout, Header, FloatingActionButton } from '../components/Layout';
 import { CompactTorrentList } from '../components/CompactTorrentList';
 import { AddTorrent } from '../components/AddTorrent';
+import { TorrentDetail } from '../components/TorrentDetail';
 import { useDirectTorrents, useDirectGlobalStats, useDirectTorrentActions } from '../hooks/useDirectTorrents';
 import { formatSpeed } from '../utils/formatters';
 import {
@@ -31,6 +32,7 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
   const [showAddTorrent, setShowAddTorrent] = useState(false);
   const [filter, setFilter] = useState<string>('all');
   const [addSuccess, setAddSuccess] = useState<string | null>(null);
+  const [selectedHash, setSelectedHash] = useState<string | null>(null);
   const successTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => () => {
@@ -53,6 +55,11 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
     addTorrentUrl,
     addTorrentFile,
   } = useDirectTorrentActions();
+
+  const selectedTorrent = useMemo(
+    () => (selectedHash ? torrents.find((t) => t.hash === selectedHash) ?? null : null),
+    [torrents, selectedHash],
+  );
 
   const filteredTorrents = useMemo(() => {
     return torrents.filter(torrent => {
@@ -198,6 +205,7 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
           onPause={(hash) => pauseTorrent.mutate(hash)}
           onResume={(hash) => resumeTorrent.mutate(hash)}
           onDelete={(hash, deleteFiles) => deleteTorrent.mutate({ hash, deleteFiles })}
+          onTorrentClick={(t) => setSelectedHash(t.hash)}
         />
       </div>
 
@@ -213,6 +221,16 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
         onAddUrl={handleAddTorrentUrl}
         onAddFile={handleAddTorrentFile}
       />
+
+      {selectedTorrent && (
+        <TorrentDetail
+          torrent={selectedTorrent}
+          onClose={() => setSelectedHash(null)}
+          onPause={(hash) => pauseTorrent.mutate(hash)}
+          onResume={(hash) => resumeTorrent.mutate(hash)}
+          onDelete={(hash, deleteFiles) => deleteTorrent.mutate({ hash, deleteFiles })}
+        />
+      )}
     </Layout>
   );
 }
