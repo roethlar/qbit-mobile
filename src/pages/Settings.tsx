@@ -148,10 +148,11 @@ export function Settings({ onBack }: SettingsProps) {
         }
       />
 
+      <div className="flex-1 overflow-y-auto">
       {saveMessage && (
         <div className={`mx-4 mb-4 p-3 rounded-xl ${
-          saveMessage.includes('success') 
-            ? 'bg-green-50 border border-green-200' 
+          saveMessage.includes('success')
+            ? 'bg-green-50 border border-green-200'
             : 'bg-red-50 border border-red-200'
         }`}>
           <p className={`text-sm font-medium ${
@@ -335,6 +336,7 @@ export function Settings({ onBack }: SettingsProps) {
 
         {/* Spacing for FAB */}
         <div className="h-20" />
+      </div>
       </div>
     </Layout>
   );

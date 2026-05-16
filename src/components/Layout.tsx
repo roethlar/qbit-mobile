@@ -11,9 +11,12 @@ interface LayoutProps {
 export function Layout({ children, className, padding = true }: LayoutProps) {
   return (
     <div className={clsx(
-      'min-h-screen bg-gray-50 dark:bg-gray-950',
+      // h-dvh anchors the layout to the actual viewport height so child
+      // flex-1 + overflow-auto containers (the virtualized torrent list,
+      // the Settings scroll area) get a real clipping height to scroll within.
+      'h-dvh bg-gray-50 dark:bg-gray-950',
       'pt-safe-top pb-safe',
-      'flex flex-col',
+      'flex flex-col overflow-hidden',
       padding && 'px-4',
       className
     )}>
