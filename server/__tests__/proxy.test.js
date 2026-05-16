@@ -9,12 +9,16 @@ const axios = (await import('axios')).default;
 const axiosMock = vi.mocked(axios);
 
 const { app } = await import('../server.js');
+const { __resetCapabilitiesForTests } = await import('../qbClient.js');
 
 const CREDS = ['tester', 'testpw'];
 
 beforeEach(() => {
   axiosMock.mockReset();
   axiosMock.mockResolvedValue({ status: 200, data: [], headers: {} });
+  // qbClient holds module state (cap flags, session cookie). Without this
+  // a prior test's confirmLegacyMode() leaks and changes path routing.
+  __resetCapabilitiesForTests();
 });
 
 describe('app auth', () => {
@@ -349,6 +353,12 @@ describe('qB4 404 fallback for stop/start', () => {
       .auth(...CREDS)
       .send(`hashes=${VALID_HASH}`);
     expect(res.status).toBe(200);
+    const calls = axiosMock.mock.calls.map((c) => c[0].url);
+    // The initial /start must be attempted before the fallback retry —
+    // otherwise the test is just exercising legacy-mode routing carried
+    // over from another test.
+    expect(calls.some((u) => u.endsWith('/torrents/start'))).toBe(true);
+    expect(calls.some((u) => u.endsWith('/torrents/resume'))).toBe(true);
   });
 
   it('does not retry /torrents/delete on 404', async () => {

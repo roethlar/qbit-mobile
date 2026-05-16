@@ -130,6 +130,19 @@ export function confirmLegacyMode() {
   }
 }
 
+// Test-only: reset module state between tests so the legacy flag doesn't
+// leak from one case into another. capsDetected is set to true so the
+// lazy detection probe doesn't fire on every test request and pollute
+// the axios mock call list with extra /app/webapiVersion hits. Production
+// code must not call this.
+export function __resetCapabilitiesForTests() {
+  qbApiCapabilities.legacy = false;
+  capsDetected = true;
+  qbApiVersion = null;
+  sessionCookie = null;
+  loginInFlight = null;
+}
+
 // `dataOrFactory` may be a value (string/Buffer/URLSearchParams) OR a
 // thunk returning `{ data, headers }`. Use the thunk form for one-shot
 // streams like multipart FormData so we can rebuild after a 401 retry.

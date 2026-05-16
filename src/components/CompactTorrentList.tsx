@@ -205,9 +205,9 @@ export function CompactTorrentList({
 
         {showTags && (availableTags.length > 0 || selectedTag) && (
           <div className="mt-1 p-2 bg-gray-50 dark:bg-gray-800 rounded">
-            {selectedTag && !availableTags.includes(selectedTag) && (
+            {selectedTag && visibleTorrents.length === 0 && (
               <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-1">
-                No torrents currently carry the tag "{selectedTag}".
+                No torrents in the current view match tag "{selectedTag}".
               </p>
             )}
             <div className="flex items-center justify-between mb-1">
