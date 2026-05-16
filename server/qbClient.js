@@ -173,6 +173,15 @@ export async function makeQbRequest(method, path, dataOrFactory, headers = {}) {
       sessionCookie = sid.split(';')[0];
     }
   }
+
+  // Lazy capability detection: in local-bypass mode the upstream never
+  // returns 401, so re-login isn't triggered and finalizeLogin can't run.
+  // If we haven't detected yet, kick it off on the first non-error reply.
+  // Fire-and-forget so the response isn't delayed.
+  if (!capsDetected && response.status < 500) {
+    detectCapabilities().catch(() => { /* retried next request */ });
+  }
+
   return response;
 }
 

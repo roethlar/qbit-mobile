@@ -9,8 +9,11 @@ function detailKey(hash: string, leaf: 'properties' | 'files' | 'trackers') {
 
 // While the detail drawer is open we poll the per-torrent endpoints; the
 // general/properties pane updates fast, files and trackers change rarely.
-const POLL_FAST = 5_000;
-const POLL_SLOW = 10_000;
+// On error we back off rather than stop, mirroring the main torrent list.
+const POLL_FAST_OK = 5_000;
+const POLL_FAST_ERROR = 30_000;
+const POLL_SLOW_OK = 10_000;
+const POLL_SLOW_ERROR = 30_000;
 
 export function useTorrentDetail(hash: string | null) {
   const enabled = !!hash;
@@ -18,7 +21,7 @@ export function useTorrentDetail(hash: string | null) {
     queryKey: enabled ? detailKey(hash!, 'properties') : ['torrent', '', 'properties'],
     queryFn: () => api.getTorrentProperties(hash!),
     enabled,
-    refetchInterval: (q) => (q.state.error ? false : POLL_FAST),
+    refetchInterval: (q) => (q.state.error ? POLL_FAST_ERROR : POLL_FAST_OK),
     refetchOnReconnect: true,
     staleTime: 3_000,
     placeholderData: (prev) => prev,
@@ -28,7 +31,7 @@ export function useTorrentDetail(hash: string | null) {
     queryKey: enabled ? detailKey(hash!, 'files') : ['torrent', '', 'files'],
     queryFn: () => api.getTorrentFiles(hash!),
     enabled,
-    refetchInterval: (q) => (q.state.error ? false : POLL_SLOW),
+    refetchInterval: (q) => (q.state.error ? POLL_SLOW_ERROR : POLL_SLOW_OK),
     refetchOnReconnect: true,
     staleTime: 5_000,
     placeholderData: (prev) => prev,
@@ -38,7 +41,7 @@ export function useTorrentDetail(hash: string | null) {
     queryKey: enabled ? detailKey(hash!, 'trackers') : ['torrent', '', 'trackers'],
     queryFn: () => api.getTorrentTrackers(hash!),
     enabled,
-    refetchInterval: (q) => (q.state.error ? false : POLL_SLOW),
+    refetchInterval: (q) => (q.state.error ? POLL_SLOW_ERROR : POLL_SLOW_OK),
     refetchOnReconnect: true,
     staleTime: 5_000,
     placeholderData: (prev) => prev,

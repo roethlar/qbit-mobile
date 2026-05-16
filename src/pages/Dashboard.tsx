@@ -8,6 +8,7 @@ import { AddTorrent } from '../components/AddTorrent';
 import { TorrentDetail } from '../components/TorrentDetail';
 import { useDirectTorrents, useDirectGlobalStats, useDirectTorrentActions } from '../hooks/useDirectTorrents';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import { useTorrentFilters } from '../hooks/useTorrentFilters';
 import { formatSpeed } from '../utils/formatters';
 import {
   PAUSED_STATES_SET,
@@ -105,6 +106,16 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
     });
   }, [torrents, filter]);
 
+  // Hoisted so "Select all" operates on the same list the user sees,
+  // not the pre-search/tag/sort superset.
+  const {
+    searchQuery, setSearchQuery,
+    sortBy, sortOrder, handleSort,
+    selectedTag, setSelectedTag,
+    availableTags,
+    filteredAndSortedTorrents: visibleTorrents,
+  } = useTorrentFilters(filteredTorrents);
+
   const handleRefresh = async () => {
     await refetch();
   };
@@ -132,8 +143,8 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
   };
 
   const visibleSelectedHashes = useMemo(
-    () => filteredTorrents.filter((t) => selectedHashes.has(t.hash)).map((t) => t.hash),
-    [filteredTorrents, selectedHashes],
+    () => visibleTorrents.filter((t) => selectedHashes.has(t.hash)).map((t) => t.hash),
+    [visibleTorrents, selectedHashes],
   );
 
   const handleBulkPause = () => {
@@ -155,19 +166,19 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
   const selectAllVisible = () => {
     setSelectedHashes((prev) => {
       const next = new Set(prev);
-      for (const t of filteredTorrents) next.add(t.hash);
+      for (const t of visibleTorrents) next.add(t.hash);
       return next;
     });
   };
   const deselectAllVisible = () => {
     setSelectedHashes((prev) => {
       const next = new Set(prev);
-      for (const t of filteredTorrents) next.delete(t.hash);
+      for (const t of visibleTorrents) next.delete(t.hash);
       return next;
     });
   };
   const allVisibleSelected =
-    filteredTorrents.length > 0 && visibleSelectedHashes.length === filteredTorrents.length;
+    visibleTorrents.length > 0 && visibleSelectedHashes.length === visibleTorrents.length;
 
   const filters = useMemo(() => {
     const counts = { downloading: 0, seeding: 0, paused: 0, completed: 0 };
@@ -313,7 +324,8 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
 
       <div className="flex-1">
         <CompactTorrentList
-          torrents={filteredTorrents}
+          visibleTorrents={visibleTorrents}
+          unfilteredCount={filteredTorrents.length}
           onPause={(hash) => pauseTorrent.mutate(hash)}
           onResume={(hash) => resumeTorrent.mutate(hash)}
           onDelete={(hash, deleteFiles) => deleteTorrent.mutate({ hash, deleteFiles })}
@@ -321,6 +333,14 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
           selectMode={selectMode}
           selectedHashes={selectedHashes}
           onToggleSelect={toggleSelect}
+          searchQuery={searchQuery}
+          onSearchQueryChange={setSearchQuery}
+          sortBy={sortBy}
+          sortOrder={sortOrder}
+          onSort={handleSort}
+          selectedTag={selectedTag}
+          onSelectedTagChange={setSelectedTag}
+          availableTags={availableTags}
         />
       </div>
 

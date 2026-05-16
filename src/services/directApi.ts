@@ -39,19 +39,38 @@ export async function deleteTorrent(hash: string, deleteFiles = false): Promise<
   }));
 }
 
+// The proxy caps each request at 200 hashes as a safety net. We chunk well
+// below that so a "select all" against a 2000-torrent install fans out into
+// ~20 sequential requests instead of one rejected mega-POST. Sequential so
+// a failure mid-way doesn't continue racing — the user sees the error and
+// the next refetch reconciles partial progress.
+const BULK_CHUNK_SIZE = 100;
+
+async function chunked<T>(items: T[], size: number, fn: (chunk: T[]) => Promise<unknown>) {
+  for (let i = 0; i < items.length; i += size) {
+    await fn(items.slice(i, i + size));
+  }
+}
+
 export async function pauseTorrents(hashes: string[]): Promise<void> {
-  await api.post('/torrents/stop', new URLSearchParams({ hashes: hashes.join('|') }));
+  await chunked(hashes, BULK_CHUNK_SIZE, (chunk) =>
+    api.post('/torrents/stop', new URLSearchParams({ hashes: chunk.join('|') })),
+  );
 }
 
 export async function resumeTorrents(hashes: string[]): Promise<void> {
-  await api.post('/torrents/start', new URLSearchParams({ hashes: hashes.join('|') }));
+  await chunked(hashes, BULK_CHUNK_SIZE, (chunk) =>
+    api.post('/torrents/start', new URLSearchParams({ hashes: chunk.join('|') })),
+  );
 }
 
 export async function deleteTorrents(hashes: string[], deleteFiles = false): Promise<void> {
-  await api.post('/torrents/delete', new URLSearchParams({
-    hashes: hashes.join('|'),
-    deleteFiles: deleteFiles.toString(),
-  }));
+  await chunked(hashes, BULK_CHUNK_SIZE, (chunk) =>
+    api.post('/torrents/delete', new URLSearchParams({
+      hashes: chunk.join('|'),
+      deleteFiles: deleteFiles.toString(),
+    })),
+  );
 }
 
 export interface AddTorrentOptions {

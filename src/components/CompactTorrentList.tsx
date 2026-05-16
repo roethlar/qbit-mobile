@@ -4,14 +4,18 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import type { Torrent, TorrentState } from '../types/qbittorrent';
 import { PAUSED_STATES_SET } from '../types/qbittorrent';
 import { formatBytes, formatSpeed, formatProgress, getStateColor, getStateText } from '../utils/formatters';
-import { useTorrentFilters } from '../hooks/useTorrentFilters';
 import { BottomSheet } from './Layout';
+import type { SortField, SortOrder } from '../hooks/useTorrentFilters';
 import { clsx } from 'clsx';
 
 const isPausedState = (state: TorrentState) => PAUSED_STATES_SET.has(state);
 
 interface CompactTorrentListProps {
-  torrents: Torrent[];
+  // visibleTorrents: post-everything-filter list this component should render.
+  // unfilteredCount: denominator for the "N/M" toolbar count — typically the
+  //   length of the parent's top-bar-filtered list, before search/tag/sort.
+  visibleTorrents: Torrent[];
+  unfilteredCount: number;
   onPause: (hash: string) => void;
   onResume: (hash: string) => void;
   onDelete: (hash: string, deleteFiles?: boolean) => void;
@@ -19,10 +23,21 @@ interface CompactTorrentListProps {
   selectMode?: boolean;
   selectedHashes?: ReadonlySet<string>;
   onToggleSelect?: (hash: string) => void;
+  // Search / sort / tag state lifted to the parent so "select all visible"
+  // and the displayed counts agree on what "visible" means.
+  searchQuery: string;
+  onSearchQueryChange: (q: string) => void;
+  sortBy: SortField;
+  sortOrder: SortOrder;
+  onSort: (field: SortField) => void;
+  selectedTag: string;
+  onSelectedTagChange: (tag: string) => void;
+  availableTags: string[];
 }
 
 export function CompactTorrentList({
-  torrents,
+  visibleTorrents,
+  unfilteredCount,
   onPause,
   onResume,
   onDelete,
@@ -30,6 +45,14 @@ export function CompactTorrentList({
   selectMode = false,
   selectedHashes,
   onToggleSelect,
+  searchQuery,
+  onSearchQueryChange,
+  sortBy,
+  sortOrder,
+  onSort,
+  selectedTag,
+  onSelectedTagChange,
+  availableTags,
 }: CompactTorrentListProps) {
   const [selectedTorrent, setSelectedTorrent] = useState<Torrent | null>(null);
   const [showActions, setShowActions] = useState(false);
@@ -38,23 +61,14 @@ export function CompactTorrentList({
   const [showTags, setShowTags] = useState(false);
   const [showSortOptions, setShowSortOptions] = useState(false);
 
-  const {
-    searchQuery, setSearchQuery,
-    sortBy, sortOrder,
-    selectedTag, setSelectedTag,
-    availableTags,
-    filteredAndSortedTorrents,
-    handleSort,
-  } = useTorrentFilters(torrents);
-
   const parentRef = useRef<HTMLDivElement | null>(null);
   const rowVirtualizer = useVirtualizer({
-    count: filteredAndSortedTorrents.length,
+    count: visibleTorrents.length,
     getScrollElement: () => parentRef.current,
     // Rough average; measureElement adjusts per row as it scrolls into view.
     estimateSize: () => 46,
     overscan: 8,
-    getItemKey: index => filteredAndSortedTorrents[index]?.hash ?? index,
+    getItemKey: index => visibleTorrents[index]?.hash ?? index,
   });
 
   const handleRowClick = useCallback((torrent: Torrent) => {
@@ -99,7 +113,7 @@ export function CompactTorrentList({
     setSelectedTorrent(null);
   };
 
-  if (torrents.length === 0) {
+  if (unfilteredCount === 0) {
     return (
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="text-center">
@@ -122,7 +136,7 @@ export function CompactTorrentList({
       <div className="bg-white dark:bg-gray-850 border-b border-gray-100 dark:border-gray-700 px-2 py-1">
         <div className="flex items-center justify-between">
           <span className="text-xs text-gray-500">
-            {filteredAndSortedTorrents.length}/{torrents.length}
+            {visibleTorrents.length}/{unfilteredCount}
           </span>
           <div className="flex items-center">
             {availableTags.length > 0 && (
@@ -171,7 +185,7 @@ export function CompactTorrentList({
               ].map((option) => (
                 <button
                   key={option.key}
-                  onClick={() => handleSort(option.key)}
+                  onClick={() => onSort(option.key)}
                   className={clsx(
                     'flex items-center justify-between p-2 rounded-lg transition-colors',
                     sortBy === option.key
@@ -195,7 +209,7 @@ export function CompactTorrentList({
               <span className="text-xs font-medium text-gray-600">Tags</span>
               {selectedTag && (
                 <button
-                  onClick={() => setSelectedTag('')}
+                  onClick={() => onSelectedTagChange('')}
                   className="text-xs text-primary-600 hover:text-primary-800"
                 >
                   Clear
@@ -207,7 +221,7 @@ export function CompactTorrentList({
                 <button
                   key={tag}
                   onClick={() => {
-                    setSelectedTag(selectedTag === tag ? '' : tag);
+                    onSelectedTagChange(selectedTag === tag ? '' : tag);
                     setShowTags(false);
                   }}
                   className={clsx(
@@ -230,14 +244,14 @@ export function CompactTorrentList({
             <input
               type="text"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => onSearchQueryChange(e.target.value)}
               placeholder="Search..."
               className="w-full pl-7 pr-2 py-1 border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded text-xs focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-transparent"
               autoFocus
             />
             {searchQuery && (
               <button
-                onClick={() => setSearchQuery('')}
+                onClick={() => onSearchQueryChange('')}
                 aria-label="Clear search"
                 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
               >
@@ -257,7 +271,7 @@ export function CompactTorrentList({
           }}
         >
           {virtualItems.map(virtualRow => {
-            const torrent = filteredAndSortedTorrents[virtualRow.index];
+            const torrent = visibleTorrents[virtualRow.index];
             if (!torrent) return null;
             const isSelected = selectedHashes ? selectedHashes.has(torrent.hash) : false;
             return (

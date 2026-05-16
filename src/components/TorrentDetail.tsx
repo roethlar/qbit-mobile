@@ -104,6 +104,14 @@ export function TorrentDetail({ torrent, onClose, onPause, onResume, onDelete }:
             {getStateText(torrent.state)} {formatProgress(torrent.progress)} · {formatBytes(torrent.size)}
           </p>
         </div>
+        {(properties.isError || files.isError || trackers.isError) && (
+          <span
+            role="status"
+            className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300"
+          >
+            Stale
+          </span>
+        )}
       </header>
 
       <nav className="flex border-b border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-900" role="tablist">

@@ -5,10 +5,13 @@ import { VitePWA } from 'vite-plugin-pwa'
 // NOTE: `npm run dev` proxies /api straight to qBittorrent and does NOT
 // route through the Express server. That means in dev there is no app-level
 // Basic auth, no endpoint allowlist, no setPreferences key filter, and no
-// qB4/qB5 path translation. This is intentional for fast local iteration on
-// the frontend — DO NOT expose the dev server outside a trusted network.
-// Production traffic always goes through server/server.js, which enforces
-// all of the above.
+// qB4/qB5 path translation. To keep that surface from being reachable on
+// the LAN by accident, the dev server binds to 127.0.0.1 by default. Set
+// VITE_DEV_HOST=0.0.0.0 (and accept the security implications) to expose
+// it for phone-on-LAN development.
+const devHost = process.env.VITE_DEV_HOST || '127.0.0.1';
+const devIsLoopback = devHost === '127.0.0.1' || devHost === '::1' || devHost === 'localhost';
+
 export default defineConfig({
   plugins: [
     react(),
@@ -54,9 +57,12 @@ export default defineConfig({
     }),
   ],
   server: {
-    host: '0.0.0.0',
+    host: devHost,
     port: 3000,
-    allowedHosts: 'all',
+    // allowedHosts is only relaxed when the user explicitly opts into a
+    // non-loopback bind. On loopback the default (just the configured host)
+    // is correct.
+    ...(devIsLoopback ? {} : { allowedHosts: 'all' as const }),
     proxy: {
       '/api': {
         target: process.env.QBIT_HOST || 'http://localhost:8080',
