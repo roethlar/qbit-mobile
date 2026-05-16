@@ -113,6 +113,23 @@ For the best experience, configure qBittorrent to allow local authentication byp
 
 The proxy auto-detects the qBittorrent Web API version and translates legacy endpoints, so qBittorrent 4.x (with `/torrents/pause` / `/torrents/resume`) and 5.x (with `/torrents/stop` / `/torrents/start`) both work without configuration.
 
+## Upgrading from 1.0.x
+
+Version 1.1 adds app-level authentication and several `.env` keys. If you're upgrading an existing install:
+
+- The simplest path is to rerun `sudo ./deploy.sh` and answer "yes" when asked to overwrite `.env`. The script generates a random `APP_PASSWORD` for you and prints it once.
+- To upgrade by hand, add these lines to your existing `.env` before restarting the service:
+
+  ```env
+  AUTH_MODE=basic
+  APP_USERNAME=admin
+  APP_PASSWORD=<set a strong password>
+  ```
+
+  The server now refuses to boot when `AUTH_MODE=basic` (the default) and the credentials are missing. If your install is on a fully trusted LAN where you'd rather not have auth, set `AUTH_MODE=disabled` instead.
+
+- The proxy now only forwards an allowlist of qBittorrent endpoints. If you're using this app's API directly from a custom client and depended on paths beyond `/torrents/{info,stop,start,delete,add}`, `/transfer/info`, `/app/{preferences,setPreferences,version,webapiVersion}`, open an issue.
+
 ## Development
 
 ```bash
@@ -124,6 +141,9 @@ npm run dev
 
 # Build for production
 npm run build
+
+# Run tests
+npm test
 
 # Start production server
 npm start

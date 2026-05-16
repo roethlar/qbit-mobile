@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback, memo } from 'react';
 import { Play, Pause, Trash2, MoreVertical, Search, X, ArrowUpDown, ArrowUp, ArrowDown, Tag } from 'lucide-react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import type { Torrent, TorrentState } from '../types/qbittorrent';
-import { PAUSED_STATES } from '../types/qbittorrent';
+import { PAUSED_STATES_SET } from '../types/qbittorrent';
 import { formatBytes, formatSpeed, formatProgress, getStateColor, getStateText } from '../utils/formatters';
-
-const isPausedState = (state: TorrentState) => PAUSED_STATES.includes(state);
 import { useTorrentFilters } from '../hooks/useTorrentFilters';
 import { BottomSheet } from './Layout';
 import { clsx } from 'clsx';
+
+const isPausedState = (state: TorrentState) => PAUSED_STATES_SET.has(state);
 
 interface CompactTorrentListProps {
   torrents: Torrent[];
@@ -34,21 +35,29 @@ export function CompactTorrentList({ torrents, onPause, onResume, onDelete, onTo
     handleSort,
   } = useTorrentFilters(torrents);
 
-  const handleTorrentClick = (torrent: Torrent) => {
-    if (onTorrentClick) {
-      onTorrentClick(torrent);
-    }
-  };
+  const parentRef = useRef<HTMLDivElement | null>(null);
+  const rowVirtualizer = useVirtualizer({
+    count: filteredAndSortedTorrents.length,
+    getScrollElement: () => parentRef.current,
+    // Rough average; measureElement adjusts per row as it scrolls into view.
+    estimateSize: () => 46,
+    overscan: 8,
+    getItemKey: index => filteredAndSortedTorrents[index]?.hash ?? index,
+  });
 
-  const handleActionClick = (torrent: Torrent, e: React.MouseEvent) => {
+  const handleRowClick = useCallback((torrent: Torrent) => {
+    onTorrentClick?.(torrent);
+  }, [onTorrentClick]);
+
+  const handleRowActionClick = useCallback((torrent: Torrent, e: React.MouseEvent) => {
     e.stopPropagation();
     setSelectedTorrent(torrent);
     setShowActions(true);
-  };
+  }, []);
 
   const handlePauseResume = () => {
     if (!selectedTorrent) return;
-    
+
     if (isPausedState(selectedTorrent.state)) {
       onResume(selectedTorrent.hash);
     } else {
@@ -86,9 +95,10 @@ export function CompactTorrentList({ torrents, onPause, onResume, onDelete, onTo
     );
   }
 
+  const virtualItems = rowVirtualizer.getVirtualItems();
+
   return (
-    <div className="flex-1 flex flex-col">
-      {/* Search Header - More compact */}
+    <div className="flex-1 flex flex-col min-h-0">
       <div className="bg-white dark:bg-gray-850 border-b border-gray-100 dark:border-gray-700 px-2 py-1">
         <div className="flex items-center justify-between">
           <span className="text-xs text-gray-500">
@@ -127,7 +137,6 @@ export function CompactTorrentList({ torrents, onPause, onResume, onDelete, onTo
           </div>
         </div>
 
-        {/* Sort Options - Compact */}
         {showSortOptions && (
           <div className="mt-1 p-1 bg-gray-50 dark:bg-gray-800 rounded">
             <div className="grid grid-cols-2 gap-2 text-sm">
@@ -160,7 +169,6 @@ export function CompactTorrentList({ torrents, onPause, onResume, onDelete, onTo
           </div>
         )}
 
-        {/* Tag Filter - Popup */}
         {showTags && availableTags.length > 0 && (
           <div className="mt-1 p-2 bg-gray-50 dark:bg-gray-800 rounded">
             <div className="flex items-center justify-between mb-1">
@@ -195,7 +203,7 @@ export function CompactTorrentList({ torrents, onPause, onResume, onDelete, onTo
             </div>
           </div>
         )}
-        
+
         {showSearch && (
           <div className="relative mt-1">
             <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-3 h-3" />
@@ -220,19 +228,41 @@ export function CompactTorrentList({ torrents, onPause, onResume, onDelete, onTo
         )}
       </div>
 
-      {/* Torrent List */}
-      <div className="flex-1 overflow-auto">
-        {filteredAndSortedTorrents.map((torrent) => (
-          <CompactTorrentRow
-            key={torrent.hash}
-            torrent={torrent}
-            onClick={() => handleTorrentClick(torrent)}
-            onActionClick={(e) => handleActionClick(torrent, e)}
-          />
-        ))}
+      <div ref={parentRef} className="flex-1 overflow-auto" style={{ contain: 'strict' }}>
+        <div
+          style={{
+            height: rowVirtualizer.getTotalSize(),
+            position: 'relative',
+            width: '100%',
+          }}
+        >
+          {virtualItems.map(virtualRow => {
+            const torrent = filteredAndSortedTorrents[virtualRow.index];
+            if (!torrent) return null;
+            return (
+              <div
+                key={virtualRow.key}
+                data-index={virtualRow.index}
+                ref={rowVirtualizer.measureElement}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  transform: `translateY(${virtualRow.start}px)`,
+                }}
+              >
+                <CompactTorrentRow
+                  torrent={torrent}
+                  onClick={handleRowClick}
+                  onActionClick={handleRowActionClick}
+                />
+              </div>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Action Sheets */}
       <BottomSheet
         isOpen={showActions}
         onClose={() => setShowActions(false)}
@@ -252,7 +282,7 @@ export function CompactTorrentList({ torrents, onPause, onResume, onDelete, onTo
               {selectedTorrent && isPausedState(selectedTorrent.state) ? 'Resume' : 'Pause'}
             </span>
           </button>
-          
+
           <button
             onClick={handleDeleteClick}
             className="w-full flex items-center p-4 rounded-xl bg-red-50 dark:bg-red-900/20 active:bg-red-100 dark:active:bg-red-900/30 transition-colors"
@@ -272,7 +302,7 @@ export function CompactTorrentList({ torrents, onPause, onResume, onDelete, onTo
           <p className="text-gray-600">
             Are you sure you want to delete "{selectedTorrent?.name}"?
           </p>
-          
+
           <div className="space-y-2">
             <button
               onClick={() => handleDelete(false)}
@@ -280,14 +310,14 @@ export function CompactTorrentList({ torrents, onPause, onResume, onDelete, onTo
             >
               Delete torrent only
             </button>
-            
+
             <button
               onClick={() => handleDelete(true)}
               className="w-full bg-red-600 text-white rounded-xl py-3 px-6 font-medium active:bg-red-700 transition-colors"
             >
               Delete torrent and files
             </button>
-            
+
             <button
               onClick={() => setShowDeleteConfirm(false)}
               className="w-full ios-button-secondary"
@@ -303,21 +333,24 @@ export function CompactTorrentList({ torrents, onPause, onResume, onDelete, onTo
 
 interface CompactTorrentRowProps {
   torrent: Torrent;
-  onClick: () => void;
-  onActionClick: (e: React.MouseEvent) => void;
+  onClick: (torrent: Torrent) => void;
+  onActionClick: (torrent: Torrent, e: React.MouseEvent) => void;
 }
 
-function CompactTorrentRow({ torrent, onClick, onActionClick }: CompactTorrentRowProps) {
+const CompactTorrentRow = memo(function CompactTorrentRow({
+  torrent,
+  onClick,
+  onActionClick,
+}: CompactTorrentRowProps) {
   const isActive = torrent.state === 'downloading' || torrent.state === 'uploading';
   const isPaused = isPausedState(torrent.state);
 
   return (
     <div
       className="border-b border-gray-100 dark:border-gray-700 px-2 py-1.5 active:bg-gray-50 dark:active:bg-gray-700 transition-colors cursor-pointer"
-      onClick={onClick}
+      onClick={() => onClick(torrent)}
     >
       <div className="flex items-center justify-between">
-        {/* Left side - Name and status */}
         <div className="flex-1 min-w-0 mr-3">
           <div className="flex items-center">
             <h3 className="font-medium text-gray-900 dark:text-gray-100 text-xs leading-tight truncate selectable">
@@ -327,8 +360,7 @@ function CompactTorrentRow({ torrent, onClick, onActionClick }: CompactTorrentRo
               {getStateText(torrent.state)}
             </span>
           </div>
-          
-          {/* Progress bar */}
+
           <div
             className="w-full bg-gray-200 rounded-full h-0.5 mt-0.5"
             role="progressbar"
@@ -345,8 +377,7 @@ function CompactTorrentRow({ torrent, onClick, onActionClick }: CompactTorrentRo
               style={{ width: `${torrent.progress * 100}%` }}
             />
           </div>
-          
-          {/* Stats row */}
+
           <div className="flex items-center justify-between text-xs text-gray-600 mt-0.5">
             <div className="flex items-center space-x-3">
               <span>{formatProgress(torrent.progress)}</span>
@@ -363,13 +394,10 @@ function CompactTorrentRow({ torrent, onClick, onActionClick }: CompactTorrentRo
               )}
             </div>
           </div>
-          
-          {/* Tags row */}
         </div>
-        
-        {/* Right side - Action button */}
+
         <button
-          onClick={onActionClick}
+          onClick={(e) => onActionClick(torrent, e)}
           aria-label={`Actions for ${torrent.name}`}
           className="p-2 -mr-2 text-gray-400 active:text-gray-600 transition-colors flex-shrink-0"
         >
@@ -378,4 +406,4 @@ function CompactTorrentRow({ torrent, onClick, onActionClick }: CompactTorrentRo
       </div>
     </div>
   );
-}
+});

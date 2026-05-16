@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import {
   makeQbRequest,
   initialLogin,
@@ -18,7 +18,7 @@ import torrentsRouter from './routes/torrents.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const app = express();
+export const app = express();
 
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
@@ -258,33 +258,42 @@ if (fs.existsSync(distPath)) {
   console.log(`Serving frontend from ${distPath}`);
 }
 
-const PORT = process.env.PORT || 3000;
-const HOST = process.env.HOST || '0.0.0.0';
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', '::1', 'localhost']);
 
-const server = app.listen(PORT, HOST, async () => {
-  console.log(`Server running on http://${HOST}:${PORT}`);
-  console.log(`Proxying to qBittorrent at ${qbHost}:${qbPort}`);
-  console.log(`App auth mode: ${AUTH_MODE}`);
+export function start() {
+  const PORT = process.env.PORT || 3000;
+  const HOST = process.env.HOST || '0.0.0.0';
 
-  if (AUTH_MODE !== 'basic' && !LOOPBACK_HOSTS.has(HOST)) {
-    console.warn('');
-    console.warn('  *********************************************************');
-    console.warn('  *  WARNING: AUTH_MODE is not "basic" and HOST is bound   *');
-    console.warn('  *  to a non-loopback interface. Anyone on the network    *');
-    console.warn('  *  can drive qBittorrent through this server.            *');
-    console.warn('  *  Only safe on a fully trusted LAN.                     *');
-    console.warn('  *********************************************************');
-    console.warn('');
-  }
+  const server = app.listen(PORT, HOST, async () => {
+    console.log(`Server running on http://${HOST}:${PORT}`);
+    console.log(`Proxying to qBittorrent at ${qbHost}:${qbPort}`);
+    console.log(`App auth mode: ${AUTH_MODE}`);
 
-  try {
-    await initialLogin();
-  } catch (error) {
-    console.log('Initial qBittorrent login skipped:', error.message);
-  }
-});
+    if (AUTH_MODE !== 'basic' && !LOOPBACK_HOSTS.has(HOST)) {
+      console.warn('');
+      console.warn('  *********************************************************');
+      console.warn('  *  WARNING: AUTH_MODE is not "basic" and HOST is bound   *');
+      console.warn('  *  to a non-loopback interface. Anyone on the network    *');
+      console.warn('  *  can drive qBittorrent through this server.            *');
+      console.warn('  *  Only safe on a fully trusted LAN.                     *');
+      console.warn('  *********************************************************');
+      console.warn('');
+    }
 
-server.requestTimeout = 60_000;
-server.headersTimeout = 65_000;
-server.keepAliveTimeout = 61_000;
+    try {
+      await initialLogin();
+    } catch (error) {
+      console.log('Initial qBittorrent login skipped:', error.message);
+    }
+  });
+
+  server.requestTimeout = 60_000;
+  server.headersTimeout = 65_000;
+  server.keepAliveTimeout = 61_000;
+
+  return server;
+}
+
+const isMainModule = process.argv[1] === fileURLToPath(import.meta.url) ||
+  process.argv[1] === pathToFileURL(fileURLToPath(import.meta.url)).pathname;
+if (isMainModule) start();
