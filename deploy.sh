@@ -71,15 +71,24 @@ print_msg "Copying application files..."
 
 # Wipe directories that may contain files removed since the last release so
 # reinstalls don't keep stale source around. .env, node_modules, and dist
-# are intentionally preserved.
+# are intentionally preserved. We also remove files an older buggy deploy
+# may have spilled into the app root (BSD vs GNU cp trailing-slash quirk).
 rm -rf "${APP_DIR}/server" "${APP_DIR}/src" "${APP_DIR}/public"
+rm -rf "${APP_DIR}/__tests__" "${APP_DIR}/components" "${APP_DIR}/contexts" \
+       "${APP_DIR}/hooks" "${APP_DIR}/pages" "${APP_DIR}/routes" \
+       "${APP_DIR}/services" "${APP_DIR}/types" "${APP_DIR}/utils"
+rm -f "${APP_DIR}/App.tsx" "${APP_DIR}/main.tsx" "${APP_DIR}/index.css" \
+      "${APP_DIR}/manifest.json" "${APP_DIR}/qbClient.js" "${APP_DIR}/server.js"
 
-cp -r server/ "${APP_DIR}/"
+# No trailing slash on the source path — on BSD cp (macOS) `cp -r src/ dest/`
+# copies the *contents* of src into dest instead of creating dest/src/.
+cp -R server "${APP_DIR}/"
+cp -R src "${APP_DIR}/"
+cp -R public "${APP_DIR}/"
+
 cp package.json "${APP_DIR}/"
 cp package-lock.json "${APP_DIR}/"
 cp .env.example "${APP_DIR}/"
-
-cp -r src/ "${APP_DIR}/"
 cp index.html "${APP_DIR}/"
 cp vite.config.ts "${APP_DIR}/"
 cp tsconfig.json "${APP_DIR}/"
@@ -87,7 +96,6 @@ cp tsconfig.node.json "${APP_DIR}/"
 cp tailwind.config.js "${APP_DIR}/"
 cp postcss.config.js "${APP_DIR}/"
 cp eslint.config.js "${APP_DIR}/"
-cp -r public/ "${APP_DIR}/"
 
 print_msg "Copied essential files for build and runtime"
 
