@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, memo } from 'react';
-import { Play, Pause, Trash2, MoreVertical, Search, X, ArrowUpDown, ArrowUp, ArrowDown, Tag } from 'lucide-react';
+import { Play, Pause, Trash2, MoreVertical, Search, X, ArrowUpDown, ArrowUp, ArrowDown, Tag, Check } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { Torrent, TorrentState } from '../types/qbittorrent';
 import { PAUSED_STATES_SET } from '../types/qbittorrent';
@@ -16,9 +16,21 @@ interface CompactTorrentListProps {
   onResume: (hash: string) => void;
   onDelete: (hash: string, deleteFiles?: boolean) => void;
   onTorrentClick?: (torrent: Torrent) => void;
+  selectMode?: boolean;
+  selectedHashes?: ReadonlySet<string>;
+  onToggleSelect?: (hash: string) => void;
 }
 
-export function CompactTorrentList({ torrents, onPause, onResume, onDelete, onTorrentClick }: CompactTorrentListProps) {
+export function CompactTorrentList({
+  torrents,
+  onPause,
+  onResume,
+  onDelete,
+  onTorrentClick,
+  selectMode = false,
+  selectedHashes,
+  onToggleSelect,
+}: CompactTorrentListProps) {
   const [selectedTorrent, setSelectedTorrent] = useState<Torrent | null>(null);
   const [showActions, setShowActions] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -46,14 +58,22 @@ export function CompactTorrentList({ torrents, onPause, onResume, onDelete, onTo
   });
 
   const handleRowClick = useCallback((torrent: Torrent) => {
+    if (selectMode) {
+      onToggleSelect?.(torrent.hash);
+      return;
+    }
     onTorrentClick?.(torrent);
-  }, [onTorrentClick]);
+  }, [selectMode, onToggleSelect, onTorrentClick]);
 
   const handleRowActionClick = useCallback((torrent: Torrent, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (selectMode) {
+      onToggleSelect?.(torrent.hash);
+      return;
+    }
     setSelectedTorrent(torrent);
     setShowActions(true);
-  }, []);
+  }, [selectMode, onToggleSelect]);
 
   const handlePauseResume = () => {
     if (!selectedTorrent) return;
@@ -239,6 +259,7 @@ export function CompactTorrentList({ torrents, onPause, onResume, onDelete, onTo
           {virtualItems.map(virtualRow => {
             const torrent = filteredAndSortedTorrents[virtualRow.index];
             if (!torrent) return null;
+            const isSelected = selectedHashes ? selectedHashes.has(torrent.hash) : false;
             return (
               <div
                 key={virtualRow.key}
@@ -254,6 +275,8 @@ export function CompactTorrentList({ torrents, onPause, onResume, onDelete, onTo
               >
                 <CompactTorrentRow
                   torrent={torrent}
+                  selectMode={selectMode}
+                  isSelected={isSelected}
                   onClick={handleRowClick}
                   onActionClick={handleRowActionClick}
                 />
@@ -333,12 +356,16 @@ export function CompactTorrentList({ torrents, onPause, onResume, onDelete, onTo
 
 interface CompactTorrentRowProps {
   torrent: Torrent;
+  selectMode: boolean;
+  isSelected: boolean;
   onClick: (torrent: Torrent) => void;
   onActionClick: (torrent: Torrent, e: React.MouseEvent) => void;
 }
 
 const CompactTorrentRow = memo(function CompactTorrentRow({
   torrent,
+  selectMode,
+  isSelected,
   onClick,
   onActionClick,
 }: CompactTorrentRowProps) {
@@ -347,7 +374,12 @@ const CompactTorrentRow = memo(function CompactTorrentRow({
 
   return (
     <div
-      className="border-b border-gray-100 dark:border-gray-700 px-2 py-1.5 active:bg-gray-50 dark:active:bg-gray-700 transition-colors cursor-pointer"
+      className={clsx(
+        'border-b border-gray-100 dark:border-gray-700 px-2 py-1.5 transition-colors cursor-pointer',
+        isSelected
+          ? 'bg-primary-50 dark:bg-primary-900/20 border-l-2 border-l-primary-600'
+          : 'active:bg-gray-50 dark:active:bg-gray-700',
+      )}
       onClick={() => onClick(torrent)}
     >
       <div className="flex items-center justify-between">
@@ -396,13 +428,29 @@ const CompactTorrentRow = memo(function CompactTorrentRow({
           </div>
         </div>
 
-        <button
-          onClick={(e) => onActionClick(torrent, e)}
-          aria-label={`Actions for ${torrent.name}`}
-          className="p-2 -mr-2 text-gray-400 active:text-gray-600 transition-colors flex-shrink-0"
-        >
-          <MoreVertical className="w-4 h-4" />
-        </button>
+        {selectMode ? (
+          <button
+            onClick={(e) => onActionClick(torrent, e)}
+            aria-label={isSelected ? `Deselect ${torrent.name}` : `Select ${torrent.name}`}
+            aria-pressed={isSelected}
+            className={clsx(
+              'w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors',
+              isSelected
+                ? 'bg-primary-600 border-primary-600 text-white'
+                : 'border-gray-300 dark:border-gray-500',
+            )}
+          >
+            {isSelected && <Check className="w-4 h-4" />}
+          </button>
+        ) : (
+          <button
+            onClick={(e) => onActionClick(torrent, e)}
+            aria-label={`Actions for ${torrent.name}`}
+            className="p-2 -mr-2 text-gray-400 active:text-gray-600 transition-colors flex-shrink-0"
+          >
+            <MoreVertical className="w-4 h-4" />
+          </button>
+        )}
       </div>
     </div>
   );

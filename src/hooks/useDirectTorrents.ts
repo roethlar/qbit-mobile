@@ -136,6 +136,32 @@ export function useDirectTorrentActions() {
     },
   });
 
+  // Bulk variants. We skip optimistic patching here: a 50-row diff is harder
+  // to roll back cleanly, and the user already sees the action button spinner
+  // until the next 5s poll arrives.
+  const pauseTorrents = useMutation({
+    mutationFn: (hashes: string[]) => api.pauseTorrents(hashes),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: TORRENTS_KEY });
+    },
+  });
+
+  const resumeTorrents = useMutation({
+    mutationFn: (hashes: string[]) => api.resumeTorrents(hashes),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: TORRENTS_KEY });
+    },
+  });
+
+  const deleteTorrents = useMutation({
+    mutationFn: ({ hashes, deleteFiles }: { hashes: string[]; deleteFiles?: boolean }) =>
+      api.deleteTorrents(hashes, deleteFiles),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: TORRENTS_KEY });
+      queryClient.invalidateQueries({ queryKey: GLOBAL_STATS_KEY });
+    },
+  });
+
   const addTorrentUrl = useMutation({
     mutationFn: ({ url, options }: { url: string; options?: api.AddTorrentOptions }) =>
       api.addTorrentUrl(url, options),
@@ -156,6 +182,9 @@ export function useDirectTorrentActions() {
     pauseTorrent,
     resumeTorrent,
     deleteTorrent,
+    pauseTorrents,
+    resumeTorrents,
+    deleteTorrents,
     addTorrentUrl,
     addTorrentFile,
   };

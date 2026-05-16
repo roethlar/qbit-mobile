@@ -33,9 +33,24 @@ export async function resumeTorrent(hash: string): Promise<void> {
 }
 
 export async function deleteTorrent(hash: string, deleteFiles = false): Promise<void> {
-  await api.post('/torrents/delete', new URLSearchParams({ 
-    hashes: hash, 
-    deleteFiles: deleteFiles.toString() 
+  await api.post('/torrents/delete', new URLSearchParams({
+    hashes: hash,
+    deleteFiles: deleteFiles.toString(),
+  }));
+}
+
+export async function pauseTorrents(hashes: string[]): Promise<void> {
+  await api.post('/torrents/stop', new URLSearchParams({ hashes: hashes.join('|') }));
+}
+
+export async function resumeTorrents(hashes: string[]): Promise<void> {
+  await api.post('/torrents/start', new URLSearchParams({ hashes: hashes.join('|') }));
+}
+
+export async function deleteTorrents(hashes: string[], deleteFiles = false): Promise<void> {
+  await api.post('/torrents/delete', new URLSearchParams({
+    hashes: hashes.join('|'),
+    deleteFiles: deleteFiles.toString(),
   }));
 }
 
