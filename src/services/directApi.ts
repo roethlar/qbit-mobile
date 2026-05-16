@@ -18,11 +18,11 @@ export async function getGlobalStats(): Promise<GlobalTransferInfo> {
 }
 
 export async function pauseTorrent(hash: string): Promise<void> {
-  await api.post('/torrents/pause', new URLSearchParams({ hashes: hash }));
+  await api.post('/torrents/stop', new URLSearchParams({ hashes: hash }));
 }
 
 export async function resumeTorrent(hash: string): Promise<void> {
-  await api.post('/torrents/resume', new URLSearchParams({ hashes: hash }));
+  await api.post('/torrents/start', new URLSearchParams({ hashes: hash }));
 }
 
 export async function deleteTorrent(hash: string, deleteFiles = false): Promise<void> {
@@ -35,7 +35,7 @@ export async function deleteTorrent(hash: string, deleteFiles = false): Promise<
 export interface AddTorrentOptions {
   savepath?: string;
   category?: string;
-  paused?: boolean;
+  stopped?: boolean;
   skip_checking?: boolean;
   sequentialDownload?: boolean;
   firstLastPiecePrio?: boolean;

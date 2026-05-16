@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Download, Upload, Folder, Wifi } from 'lucide-react';
+import { ArrowLeft, Download, Upload, Folder, Pause, Wifi } from 'lucide-react';
 import { Layout, Header } from '../components/Layout';
 import { getPreferences, setPreferences as apiSetPreferences } from '../services/directApi';
 import { formatSpeed } from '../utils/formatters';
@@ -13,6 +13,7 @@ interface DraftPrefs {
   dl_limit_kbps: number;
   up_limit_kbps: number;
   save_path: string;
+  add_stopped_enabled: boolean;
 }
 
 function toDraft(prefs: Preferences): DraftPrefs {
@@ -20,6 +21,7 @@ function toDraft(prefs: Preferences): DraftPrefs {
     dl_limit_kbps: prefs.dl_limit ? Math.round(prefs.dl_limit / 1024) : 0,
     up_limit_kbps: prefs.up_limit ? Math.round(prefs.up_limit / 1024) : 0,
     save_path: prefs.save_path || '',
+    add_stopped_enabled: prefs.add_stopped_enabled ?? false,
   };
 }
 
@@ -57,6 +59,9 @@ export function Settings({ onBack }: SettingsProps) {
     if (draft.dl_limit_kbps !== currentDlKbps) changes.dl_limit = draft.dl_limit_kbps * 1024;
     if (draft.up_limit_kbps !== currentUpKbps) changes.up_limit = draft.up_limit_kbps * 1024;
     if (draft.save_path !== (preferences.save_path || '')) changes.save_path = draft.save_path;
+    if (draft.add_stopped_enabled !== (preferences.add_stopped_enabled ?? false)) {
+      changes.add_stopped_enabled = draft.add_stopped_enabled;
+    }
     return changes;
   };
 
@@ -212,7 +217,7 @@ export function Settings({ onBack }: SettingsProps) {
         {/* Download Path */}
         <div className="bg-white dark:bg-gray-800 rounded-xl mx-4 p-4">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Download Path</h2>
-          
+
           <div>
             <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               <Folder className="w-4 h-4 mr-2" />
@@ -227,6 +232,25 @@ export function Settings({ onBack }: SettingsProps) {
               disabled={saving}
             />
           </div>
+        </div>
+
+        {/* New Torrents */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl mx-4 p-4">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">New Torrents</h2>
+
+          <label className="flex items-center justify-between">
+            <span className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300">
+              <Pause className="w-4 h-4 mr-2" />
+              Add new torrents in stopped state
+            </span>
+            <input
+              type="checkbox"
+              checked={draft?.add_stopped_enabled ?? false}
+              onChange={(e) => updateDraft('add_stopped_enabled', e.target.checked)}
+              disabled={saving}
+              className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+            />
+          </label>
         </div>
 
         {/* Connection */}

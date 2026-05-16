@@ -12,7 +12,7 @@ interface AddTorrentProps {
 export interface AddTorrentOptions {
   savepath?: string;
   category?: string;
-  paused?: boolean;
+  stopped?: boolean;
   skip_checking?: boolean;
   sequentialDownload?: boolean;
   firstLastPiecePrio?: boolean;
@@ -201,11 +201,11 @@ function TorrentOptions({ options, onChange }: TorrentOptionsProps) {
             <label className="flex items-center">
               <input
                 type="checkbox"
-                checked={options.paused || false}
-                onChange={(e) => updateOption('paused', e.target.checked)}
+                checked={options.stopped || false}
+                onChange={(e) => updateOption('stopped', e.target.checked)}
                 className="mr-3 w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
               />
-              <span className="text-sm text-gray-700">Start paused</span>
+              <span className="text-sm text-gray-700">Start stopped</span>
             </label>
 
             <label className="flex items-center">

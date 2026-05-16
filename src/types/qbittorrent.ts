@@ -150,7 +150,7 @@ export interface TorrentInfo {
 export interface Preferences {
   locale: string;
   create_subfolder_enabled: boolean;
-  start_paused_enabled: boolean;
+  add_stopped_enabled: boolean;
   auto_delete_mode: number;
   preallocate_all: boolean;
   incomplete_files_ext: boolean;

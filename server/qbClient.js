@@ -25,7 +25,9 @@ async function performLogin() {
   const loginCookies = loginResponse.headers['set-cookie'];
   if (loginCookies) {
     const cookies = Array.isArray(loginCookies) ? loginCookies : [loginCookies];
-    const sid = cookies.find(c => c.includes('SID='));
+    // qBittorrent 5.2+ appends the WebUI port to the cookie name (e.g. SID8080=...),
+    // so match any cookie whose name starts with "SID" rather than the literal "SID=".
+    const sid = cookies.find(c => /^SID\w*=/.test(c));
     if (sid) {
       sessionCookie = sid.split(';')[0];
       return;
@@ -72,7 +74,7 @@ export async function makeQbRequest(method, path, data, headers = {}) {
     const setCookie = response.headers['set-cookie'];
     if (setCookie) {
       const cookies = Array.isArray(setCookie) ? setCookie : [setCookie];
-      const sid = cookies.find(c => c.includes('SID='));
+      const sid = cookies.find(c => /^SID\w*=/.test(c));
       if (sid) {
         sessionCookie = sid.split(';')[0];
       }

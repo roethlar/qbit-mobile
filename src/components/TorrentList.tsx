@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Play, Pause, Trash2, MoreVertical } from 'lucide-react';
 import type { Torrent } from '../types/qbittorrent';
+import { PAUSED_STATES } from '../types/qbittorrent';
 import { formatBytes, formatSpeed, formatProgress, getStateColor, getStateText } from '../utils/formatters';
 import { Card, BottomSheet } from './Layout';
 import { clsx } from 'clsx';
@@ -32,8 +33,8 @@ export function TorrentList({ torrents, onPause, onResume, onDelete, onTorrentCl
 
   const handlePauseResume = () => {
     if (!selectedTorrent) return;
-    
-    if (selectedTorrent.state === 'pausedDL' || selectedTorrent.state === 'pausedUP') {
+
+    if (PAUSED_STATES.includes(selectedTorrent.state)) {
       onResume(selectedTorrent.hash);
     } else {
       onPause(selectedTorrent.hash);
@@ -91,13 +92,13 @@ export function TorrentList({ torrents, onPause, onResume, onDelete, onTorrentCl
             onClick={handlePauseResume}
             className="w-full flex items-center p-4 rounded-xl bg-gray-50 active:bg-gray-100 transition-colors"
           >
-            {selectedTorrent?.state === 'pausedDL' || selectedTorrent?.state === 'pausedUP' ? (
+            {selectedTorrent && PAUSED_STATES.includes(selectedTorrent.state) ? (
               <Play className="w-5 h-5 mr-3 text-green-600" />
             ) : (
               <Pause className="w-5 h-5 mr-3 text-orange-600" />
             )}
             <span className="text-base font-medium">
-              {selectedTorrent?.state === 'pausedDL' || selectedTorrent?.state === 'pausedUP' ? 'Resume' : 'Pause'}
+              {selectedTorrent && PAUSED_STATES.includes(selectedTorrent.state) ? 'Resume' : 'Pause'}
             </span>
           </button>
           
@@ -157,7 +158,7 @@ interface TorrentCardProps {
 
 function TorrentCard({ torrent, onClick, onActionClick }: TorrentCardProps) {
   const isActive = torrent.state === 'downloading' || torrent.state === 'uploading';
-  const isPaused = torrent.state === 'pausedDL' || torrent.state === 'pausedUP';
+  const isPaused = PAUSED_STATES.includes(torrent.state);
 
   return (
     <Card onClick={onClick} className="p-0 overflow-hidden">
