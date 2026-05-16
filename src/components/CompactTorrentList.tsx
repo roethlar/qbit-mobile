@@ -27,7 +27,6 @@ export function CompactTorrentList({ torrents, onPause, onResume, onDelete, onTo
 
   const {
     searchQuery, setSearchQuery,
-    setCurrentPage,
     sortBy, sortOrder,
     selectedTag, setSelectedTag,
     availableTags,
@@ -168,10 +167,7 @@ export function CompactTorrentList({ torrents, onPause, onResume, onDelete, onTo
               <span className="text-xs font-medium text-gray-600">Tags</span>
               {selectedTag && (
                 <button
-                  onClick={() => {
-                    setSelectedTag('');
-                    setCurrentPage(1);
-                  }}
+                  onClick={() => setSelectedTag('')}
                   className="text-xs text-primary-600 hover:text-primary-800"
                 >
                   Clear
@@ -184,7 +180,6 @@ export function CompactTorrentList({ torrents, onPause, onResume, onDelete, onTo
                   key={tag}
                   onClick={() => {
                     setSelectedTag(selectedTag === tag ? '' : tag);
-                    setCurrentPage(1);
                     setShowTags(false);
                   }}
                   className={clsx(
@@ -207,20 +202,14 @@ export function CompactTorrentList({ torrents, onPause, onResume, onDelete, onTo
             <input
               type="text"
               value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setCurrentPage(1); // Reset to first page when searching
-              }}
+              onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search..."
               className="w-full pl-7 pr-2 py-1 border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded text-xs focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-transparent"
               autoFocus
             />
             {searchQuery && (
               <button
-                onClick={() => {
-                  setSearchQuery('');
-                  setCurrentPage(1);
-                }}
+                onClick={() => setSearchQuery('')}
                 aria-label="Clear search"
                 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
               >

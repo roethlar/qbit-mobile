@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import axios from 'axios';
 import { Plus, Settings, RefreshCw, Moon, Sun } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { Layout, Header, FloatingActionButton } from '../components/Layout';
@@ -6,21 +7,33 @@ import { CompactTorrentList } from '../components/CompactTorrentList';
 import { AddTorrent } from '../components/AddTorrent';
 import { useDirectTorrents, useDirectGlobalStats, useDirectTorrentActions } from '../hooks/useDirectTorrents';
 import { formatSpeed } from '../utils/formatters';
-import { PAUSED_STATES, DOWNLOADING_STATES, SEEDING_STATES } from '../types/qbittorrent';
+import {
+  PAUSED_STATES_SET,
+  DOWNLOADING_STATES_SET,
+  SEEDING_STATES_SET,
+} from '../types/qbittorrent';
 import type { AddTorrentOptions } from '../components/AddTorrent';
 
 interface DashboardProps {
   onShowSettings: () => void;
 }
 
+function extractErrorMessage(error: unknown, fallback: string): string {
+  if (axios.isAxiosError(error)) {
+    const data = error.response?.data as { error?: string } | undefined;
+    return data?.error || error.message || fallback;
+  }
+  if (error instanceof Error) return error.message;
+  return fallback;
+}
+
 export function Dashboard({ onShowSettings }: DashboardProps) {
   const [showAddTorrent, setShowAddTorrent] = useState(false);
   const [filter, setFilter] = useState<string>('all');
-  const [addError, setAddError] = useState<string | null>(null);
   const [addSuccess, setAddSuccess] = useState<string | null>(null);
 
   const { toggleTheme, isDark } = useTheme();
-  const { data: torrents = [], isLoading, refetch } = useDirectTorrents();
+  const { data: torrents = [], isLoading, isError, refetch } = useDirectTorrents();
   const { data: globalStats } = useDirectGlobalStats();
   const {
     pauseTorrent,
@@ -30,20 +43,22 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
     addTorrentFile,
   } = useDirectTorrentActions();
 
-  const filteredTorrents = torrents.filter(torrent => {
-    switch (filter) {
-      case 'downloading':
-        return DOWNLOADING_STATES.includes(torrent.state);
-      case 'seeding':
-        return SEEDING_STATES.includes(torrent.state);
-      case 'paused':
-        return PAUSED_STATES.includes(torrent.state);
-      case 'completed':
-        return torrent.progress >= 1;
-      default:
-        return true;
-    }
-  });
+  const filteredTorrents = useMemo(() => {
+    return torrents.filter(torrent => {
+      switch (filter) {
+        case 'downloading':
+          return DOWNLOADING_STATES_SET.has(torrent.state);
+        case 'seeding':
+          return SEEDING_STATES_SET.has(torrent.state);
+        case 'paused':
+          return PAUSED_STATES_SET.has(torrent.state);
+        case 'completed':
+          return torrent.progress >= 1;
+        default:
+          return true;
+      }
+    });
+  }, [torrents, filter]);
 
   const handleRefresh = async () => {
     await refetch();
@@ -51,40 +66,34 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
 
   const handleAddTorrentUrl = async (url: string, options?: AddTorrentOptions) => {
     try {
-      setAddError(null);
       setAddSuccess(null);
       await addTorrentUrl.mutateAsync({ url, options });
       setAddSuccess('Torrent added successfully!');
       setTimeout(() => setAddSuccess(null), 3000);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to add torrent:', error);
-      const errorMsg = error?.response?.data?.error || error?.message || 'Failed to add torrent';
-      setAddError(errorMsg);
-      setTimeout(() => setAddError(null), 5000);
+      throw new Error(extractErrorMessage(error, 'Failed to add torrent'));
     }
   };
 
   const handleAddTorrentFile = async (file: File, options?: AddTorrentOptions) => {
     try {
-      setAddError(null);
       setAddSuccess(null);
       await addTorrentFile.mutateAsync({ file, options });
       setAddSuccess('Torrent file added successfully!');
       setTimeout(() => setAddSuccess(null), 3000);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to add torrent:', error);
-      const errorMsg = error?.response?.data?.error || error?.message || 'Failed to add torrent file';
-      setAddError(errorMsg);
-      setTimeout(() => setAddError(null), 5000);
+      throw new Error(extractErrorMessage(error, 'Failed to add torrent file'));
     }
   };
 
   const filters = useMemo(() => {
     const counts = { downloading: 0, seeding: 0, paused: 0, completed: 0 };
     for (const t of torrents) {
-      if (DOWNLOADING_STATES.includes(t.state)) counts.downloading++;
-      if (SEEDING_STATES.includes(t.state)) counts.seeding++;
-      if (PAUSED_STATES.includes(t.state)) counts.paused++;
+      if (DOWNLOADING_STATES_SET.has(t.state)) counts.downloading++;
+      if (SEEDING_STATES_SET.has(t.state)) counts.seeding++;
+      if (PAUSED_STATES_SET.has(t.state)) counts.paused++;
       if (t.progress >= 1) counts.completed++;
     }
     return [
@@ -154,9 +163,17 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
         </div>
       </div>
 
-      {addError && (
-        <div className="mx-4 mb-4 p-3 bg-red-50 border border-red-200 rounded-xl">
-          <p className="text-red-800 text-sm font-medium">{addError}</p>
+      {isError && (
+        <div className="mx-4 mt-2 mb-2 p-3 bg-red-50 border border-red-200 rounded-xl flex items-center justify-between gap-3">
+          <p className="text-red-800 text-sm font-medium flex-1">
+            Couldn't reach qBittorrent — retrying…
+          </p>
+          <button
+            onClick={() => refetch()}
+            className="text-red-800 text-xs font-medium underline active:opacity-70"
+          >
+            Retry
+          </button>
         </div>
       )}
 

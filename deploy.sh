@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # qBit Mobile Deployment Script for Linux
-# This script deploys the qBit Mobile application and sets up a systemd service
+# Deploys the app, configures a systemd service, and writes a populated .env.
 
-set -e
+set -euo pipefail
 
 # Colors for output
 RED='\033[0;31m'
@@ -24,7 +24,11 @@ if [ -f "${SERVICE_FILE}" ]; then
     EXISTING_SERVICE_USER=$(grep -oP '^User=\K\S+' "${SERVICE_FILE}" 2>/dev/null || true)
 fi
 
-# Function to print colored messages
+# Variables we'll fill in interactively.
+SERVICE_USER=""
+SERVICE_GROUP=""
+PRINT_GENERATED_PASS=""
+
 print_msg() {
     echo -e "${GREEN}[+]${NC} $1"
 }
@@ -37,13 +41,11 @@ print_warning() {
     echo -e "${YELLOW}[*]${NC} $1"
 }
 
-# Check if running as root
 if [[ $EUID -ne 0 ]]; then
    print_error "This script must be run as root (use sudo)"
    exit 1
 fi
 
-# Check prerequisites
 print_msg "Checking prerequisites..."
 
 if ! command -v node &> /dev/null; then
@@ -62,11 +64,9 @@ if ! command -v npm &> /dev/null; then
     exit 1
 fi
 
-# Create application directory
 print_msg "Creating application directory at ${APP_DIR}..."
 mkdir -p "${APP_DIR}"
 
-# Copy only necessary files for deployment
 print_msg "Copying application files..."
 
 # Wipe directories that may contain files removed since the last release so
@@ -74,13 +74,11 @@ print_msg "Copying application files..."
 # are intentionally preserved.
 rm -rf "${APP_DIR}/server" "${APP_DIR}/src" "${APP_DIR}/public"
 
-# Copy runtime files
 cp -r server/ "${APP_DIR}/"
 cp package.json "${APP_DIR}/"
 cp package-lock.json "${APP_DIR}/"
 cp .env.example "${APP_DIR}/"
 
-# Copy source files needed for build
 cp -r src/ "${APP_DIR}/"
 cp index.html "${APP_DIR}/"
 cp vite.config.ts "${APP_DIR}/"
@@ -93,51 +91,41 @@ cp -r public/ "${APP_DIR}/"
 
 print_msg "Copied essential files for build and runtime"
 
-# Navigate to app directory
 cd "${APP_DIR}"
 
-# Install all dependencies (including dev for build)
 print_msg "Installing dependencies..."
 npm ci || npm install
 
-# Build the frontend
 print_msg "Building frontend..."
 npm run build
 
-# Remove dev dependencies after build
-print_msg "Cleaning up dev dependencies..."
-npm ci --production || npm install --production
+# Drop dev dependencies — faster than a full reinstall.
+print_msg "Pruning dev dependencies..."
+npm prune --omit=dev
 
-# Service user configuration
-# On reinstall, default to whatever the existing service uses.
+# Service user configuration. Recommend the dedicated qbitmobile user for
+# better isolation than the shared nobody account.
 case "${EXISTING_SERVICE_USER}" in
-    qbitmobile) DEFAULT_USER_CHOICE=2 ;;
-    nobody|"")  DEFAULT_USER_CHOICE=1 ;;
-    *)          DEFAULT_USER_CHOICE=1 ;;
+    qbitmobile|"") DEFAULT_USER_CHOICE=1 ;;
+    nobody)        DEFAULT_USER_CHOICE=2 ;;
+    *)             DEFAULT_USER_CHOICE=1 ;;
 esac
 
 print_msg "Service user configuration:"
-echo "1) nobody (minimal permissions, recommended for local use)"
-echo "2) custom user (creates dedicated user account)"
+echo "1) qbitmobile (dedicated system user, recommended)"
+echo "2) nobody (shared, less isolation)"
 if [ -n "${EXISTING_SERVICE_USER}" ]; then
     print_msg "Existing service runs as: ${EXISTING_SERVICE_USER} (default: ${DEFAULT_USER_CHOICE})"
 fi
+user_choice=""
 while true; do
-    read -r -p "Choose service user type [${DEFAULT_USER_CHOICE}]: " user_choice
+    read -r -p "Choose service user [${DEFAULT_USER_CHOICE}]: " user_choice
     case ${user_choice:-${DEFAULT_USER_CHOICE}} in
         1)
-            SERVICE_USER="nobody"
-            SERVICE_GROUP="nobody"
-            print_msg "Using nobody user (minimal permissions)"
-            break
-            ;;
-        2)
             SERVICE_USER="qbitmobile"
             SERVICE_GROUP="${SERVICE_USER}"
-            print_msg "Using custom user: ${SERVICE_USER}"
-            
-            # Ensure service user/group exist
-            print_msg "Creating service user..."
+            print_msg "Using dedicated user: ${SERVICE_USER}"
+
             NOLOGIN_BIN=$(command -v nologin || command -v /usr/sbin/nologin || echo "/usr/sbin/nologin")
             if ! getent group "${SERVICE_GROUP}" >/dev/null 2>&1; then
                 if ! groupadd --system "${SERVICE_GROUP}" 2>/dev/null; then
@@ -151,21 +139,27 @@ while true; do
             fi
             break
             ;;
+        2)
+            SERVICE_USER="nobody"
+            SERVICE_GROUP="nobody"
+            print_msg "Using nobody user (minimal permissions)"
+            break
+            ;;
         *)
             print_warning "Invalid choice. Enter 1 or 2."
             ;;
     esac
 done
 
-# Interactive environment setup for novice users
 print_msg "Setting up environment (.env)"
 
 confirm_overwrite_env() {
+    local yn=""
     while true; do
         read -r -p "A .env already exists. Overwrite it? [y/N]: " yn
-        case $yn in
+        case ${yn:-N} in
             [Yy]*) return 0 ;;
-            ""|[Nn]*) return 1 ;;
+            [Nn]*) return 1 ;;
         esac
     done
 }
@@ -173,8 +167,8 @@ confirm_overwrite_env() {
 prompt_with_default() {
     local prompt="$1"
     local default="$2"
-    local var
-    read -r -p "$prompt [$default]: " var || var=""
+    local var=""
+    read -r -p "$prompt [$default]: " var || true
     if [ -z "$var" ]; then
         echo "$default"
     else
@@ -190,38 +184,64 @@ validate_port() {
     return 1
 }
 
+generate_password() {
+    # 24 chars from a strong source. Strip URL-unfriendly base64 chars so
+    # the password is easy to type from a phone.
+    if command -v openssl >/dev/null 2>&1; then
+        openssl rand -base64 24 | tr -d '/+=' | cut -c1-24
+    elif [ -r /dev/urandom ]; then
+        tr -dc 'A-Za-z0-9' </dev/urandom | head -c 24
+    else
+        date +%s%N | sha256sum | head -c 24
+    fi
+}
+
 write_env_file() {
     local app_port="$1"
     local app_host="$2"
-    local qb_host="$3"
-    local qb_port="$4"
-    local qb_user="$5"
-    local qb_pass="$6"
-    cat > "${ENV_FILE}" << EOF
-NODE_ENV=production
-PORT=${app_port}
-HOST=${app_host}
-QBITTORRENT_HOST=${qb_host}
-QBITTORRENT_PORT=${qb_port}
-QBITTORRENT_USERNAME=${qb_user}
-QBITTORRENT_PASSWORD=${qb_pass}
-EOF
+    local auth_mode="$3"
+    local app_user="$4"
+    local app_pass="$5"
+    local qb_host="$6"
+    local qb_port="$7"
+    local qb_user="$8"
+    local qb_pass="$9"
+
+    # Use printf so $-expansion / backticks in values don't get interpreted.
+    {
+        printf '%s\n' '# qBit Mobile Configuration'
+        printf '\n'
+        printf '%s\n' '# --- App server ---'
+        printf 'NODE_ENV=%s\n' 'production'
+        printf 'PORT=%s\n' "${app_port}"
+        printf 'HOST=%s\n' "${app_host}"
+        printf '\n'
+        printf '%s\n' '# --- App authentication ---'
+        printf 'AUTH_MODE=%s\n' "${auth_mode}"
+        printf 'APP_USERNAME=%s\n' "${app_user}"
+        printf 'APP_PASSWORD=%s\n' "${app_pass}"
+        printf '\n'
+        printf '%s\n' '# --- Upstream qBittorrent ---'
+        printf 'QBITTORRENT_HOST=%s\n' "${qb_host}"
+        printf 'QBITTORRENT_PORT=%s\n' "${qb_port}"
+        printf 'QBITTORRENT_USERNAME=%s\n' "${qb_user}"
+        printf 'QBITTORRENT_PASSWORD=%s\n' "${qb_pass}"
+    } > "${ENV_FILE}"
 }
 
+overwrite_env=true
 if [ -f "${ENV_FILE}" ]; then
     if confirm_overwrite_env; then
         overwrite_env=true
     else
         overwrite_env=false
     fi
-else
-    overwrite_env=true
 fi
 
 if [ "$overwrite_env" = true ]; then
     print_msg "Let's collect a few settings. Press Enter for defaults."
 
-    # App settings
+    APP_PORT=""
     while true; do
         APP_PORT=$(prompt_with_default "Web UI port" "3000")
         if validate_port "$APP_PORT"; then break; fi
@@ -229,36 +249,83 @@ if [ "$overwrite_env" = true ]; then
     done
     APP_HOST=$(prompt_with_default "Web UI host to bind" "0.0.0.0")
 
-    # qBittorrent settings
+    echo ""
+    print_msg "Web UI authentication setup:"
+    echo "1) Basic auth (recommended — required for anything beyond localhost)"
+    echo "2) Disabled (no auth — only safe on a fully trusted LAN)"
+    AUTH_MODE=""
+    APP_USER=""
+    APP_PASS=""
+    app_auth_choice=""
+    while true; do
+        read -r -p "Choose authentication method [1]: " app_auth_choice || true
+        case ${app_auth_choice:-1} in
+            1)
+                AUTH_MODE="basic"
+                APP_USER=$(prompt_with_default "Web UI username" "admin")
+                read -r -s -p "Web UI password (leave blank to auto-generate): " APP_PASS || true
+                echo
+                if [ -z "$APP_PASS" ]; then
+                    APP_PASS=$(generate_password)
+                    PRINT_GENERATED_PASS="$APP_PASS"
+                    print_msg "Generated a random password."
+                fi
+                break
+                ;;
+            2)
+                if [ "$APP_HOST" != "127.0.0.1" ] && [ "$APP_HOST" != "::1" ] && [ "$APP_HOST" != "localhost" ]; then
+                    print_warning "AUTH_MODE=disabled with HOST=${APP_HOST} means anyone on the network can drive qBittorrent."
+                    confirm_disabled=""
+                    read -r -p "Type 'yes' to confirm, anything else to choose again: " confirm_disabled || true
+                    if [ "$confirm_disabled" != "yes" ]; then
+                        continue
+                    fi
+                fi
+                AUTH_MODE="disabled"
+                APP_USER=""
+                APP_PASS=""
+                print_msg "Web UI auth disabled."
+                break
+                ;;
+            *)
+                print_warning "Invalid choice. Enter 1 or 2."
+                ;;
+        esac
+    done
+
+    echo ""
     QB_HOST=$(prompt_with_default "qBittorrent host" "localhost")
+    QB_PORT=""
     while true; do
         QB_PORT=$(prompt_with_default "qBittorrent Web UI port" "8080")
         if validate_port "$QB_PORT"; then break; fi
         print_warning "Invalid port. Enter a number 1-65535."
     done
 
-    # qBittorrent authentication configuration
     echo ""
     print_msg "qBittorrent authentication setup:"
-    echo "1) Local bypass (no authentication - recommended for localhost)"
-    echo "2) Username/Password authentication"
+    echo "1) Local bypass (qBittorrent must have localhost bypass enabled)"
+    echo "2) Username/Password"
+    QB_USER=""
+    QB_PASS=""
+    auth_choice=""
     while true; do
-        read -r -p "Choose authentication method [1]: " auth_choice
+        read -r -p "Choose authentication method [1]: " auth_choice || true
         case ${auth_choice:-1} in
             1)
                 QB_USER=""
                 QB_PASS=""
-                print_msg "Using local bypass mode (no authentication)"
+                print_msg "Using qBittorrent local bypass mode"
                 break
                 ;;
             2)
-                read -r -p "qBittorrent username: " QB_USER
+                read -r -p "qBittorrent username: " QB_USER || true
                 if [ -n "$QB_USER" ]; then
-                    read -r -s -p "qBittorrent password: " QB_PASS
+                    read -r -s -p "qBittorrent password: " QB_PASS || true
                     echo
-                    print_msg "Using username/password authentication"
+                    print_msg "Using qBittorrent username/password"
                 else
-                    print_warning "Username cannot be empty for authentication mode"
+                    print_warning "Username cannot be empty"
                     continue
                 fi
                 break
@@ -270,34 +337,31 @@ if [ "$overwrite_env" = true ]; then
     done
 
     print_msg "Writing ${ENV_FILE}..."
-    write_env_file "$APP_PORT" "$APP_HOST" "$QB_HOST" "$QB_PORT" "$QB_USER" "$QB_PASS"
+    write_env_file "$APP_PORT" "$APP_HOST" "$AUTH_MODE" "$APP_USER" "$APP_PASS" "$QB_HOST" "$QB_PORT" "$QB_USER" "$QB_PASS"
 else
     print_msg ".env file already exists; keeping current values."
+    if ! grep -qE '^AUTH_MODE=' "${ENV_FILE}"; then
+        print_warning "Existing .env has no AUTH_MODE. The server will default to AUTH_MODE=basic and refuse to start until APP_USERNAME/APP_PASSWORD are set."
+        print_warning "Edit ${ENV_FILE} manually, or rerun this script and choose to overwrite."
+    fi
 fi
 
-# Set proper permissions
+# Set permissions. .env is always 640 so the password isn't world-readable.
 print_msg "Setting permissions..."
-if [ "${SERVICE_USER}" = "nobody" ]; then
-    # For nobody user, set broader permissions since nobody may not own the files
-    chmod -R 755 "${APP_DIR}"
-    chmod 644 "${ENV_FILE}"
-    print_msg "Set broad permissions for nobody user"
-else
-    # For custom user, set restrictive permissions
-    chown -R "${SERVICE_USER}:${SERVICE_GROUP}" "${APP_DIR}"
-    chmod 750 "${APP_DIR}"
-    chmod 640 "${ENV_FILE}"
-    print_msg "Set restrictive permissions for ${SERVICE_USER}"
-fi
+chown -R "${SERVICE_USER}:${SERVICE_GROUP}" "${APP_DIR}"
+find "${APP_DIR}" -type d -exec chmod 750 {} +
+find "${APP_DIR}" -type f -exec chmod 640 {} +
+chmod 640 "${ENV_FILE}"
 
 
-# Create systemd service
 print_msg "Creating systemd service..."
 cat > "${SERVICE_FILE}" << EOF
 [Unit]
 Description=qBit Mobile - qBittorrent Web Interface
 After=network.target
 Wants=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
 
 [Service]
 Type=simple
@@ -309,38 +373,47 @@ ExecStart=/usr/bin/node ${APP_DIR}/server/server.js
 Restart=always
 RestartSec=10
 
-# Security settings
-NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=${APP_DIR}/dist
-
 # Logging
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=${SERVICE_NAME}
 
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictRealtime=true
+LockPersonality=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+CapabilityBoundingSet=
+AmbientCapabilities=
+
 [Install]
 WantedBy=multi-user.target
 EOF
 
-# Reload systemd and enable service
 print_msg "Configuring systemd service..."
 systemctl daemon-reload
-systemctl enable "${SERVICE_NAME}.service"
+systemctl enable "${SERVICE_NAME}.service" >/dev/null
 
-# Stop existing service if running
 if systemctl is-active --quiet "${SERVICE_NAME}"; then
     print_msg "Stopping existing service..."
     systemctl stop "${SERVICE_NAME}"
 fi
 
-# Start the service
 print_msg "Starting ${SERVICE_NAME} service..."
 systemctl start "${SERVICE_NAME}"
 
-# Wait a moment and check status
 sleep 2
 if systemctl is-active --quiet "${SERVICE_NAME}"; then
     print_msg "Service started successfully!"
@@ -351,25 +424,33 @@ if systemctl is-active --quiet "${SERVICE_NAME}"; then
     ENV_QB_HOST=$(grep ^QBITTORRENT_HOST= "${ENV_FILE}" | cut -d= -f2- 2>/dev/null || echo "localhost")
     ENV_QB_PORT=$(grep ^QBITTORRENT_PORT= "${ENV_FILE}" | cut -d= -f2- 2>/dev/null || echo "8080")
     ENV_PORT=$(grep ^PORT= "${ENV_FILE}" | cut -d= -f2- 2>/dev/null || echo "3000")
+    ENV_AUTH=$(grep ^AUTH_MODE= "${ENV_FILE}" | cut -d= -f2- 2>/dev/null || echo "basic")
+    ENV_USER=$(grep ^APP_USERNAME= "${ENV_FILE}" | cut -d= -f2- 2>/dev/null || echo "")
     print_msg "Configuration:"
     print_msg "  Service user: ${SERVICE_USER}"
     print_msg "  Web UI port: ${ENV_PORT}"
     print_msg "  qBittorrent: ${ENV_QB_HOST}:${ENV_QB_PORT}"
-    print_msg "  Auth mode: $(if grep -qE '^QBITTORRENT_USERNAME=.+$' "${ENV_FILE}" 2>/dev/null; then echo "Username/Password"; else echo "Local bypass"; fi)"
+    print_msg "  App auth: ${ENV_AUTH}"
+    if [ "${ENV_AUTH}" = "basic" ]; then
+        print_msg "  App username: ${ENV_USER}"
+    fi
+    if [ -n "${PRINT_GENERATED_PASS}" ]; then
+        print_msg ""
+        print_warning "Generated app password (shown once — store it now):"
+        print_warning "  ${PRINT_GENERATED_PASS}"
+    fi
     print_msg ""
     print_msg "Management commands:"
     print_msg "  Service status: systemctl status ${SERVICE_NAME}"
     print_msg "  View logs: journalctl -u ${SERVICE_NAME} -f"
     print_msg "  Restart service: systemctl restart ${SERVICE_NAME}"
     print_msg ""
-    # Resolve a non-loopback IPv4 for the access URL. Fall back gracefully
-    # since 'hostname' isn't installed on every distro.
     HOST_IP=""
     if command -v hostname >/dev/null 2>&1; then
-        HOST_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+        HOST_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || true)
     fi
     if [ -z "${HOST_IP}" ] && command -v ip >/dev/null 2>&1; then
-        HOST_IP=$(ip -4 -o addr show scope global 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -n1)
+        HOST_IP=$(ip -4 -o addr show scope global 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -n1 || true)
     fi
     HOST_IP="${HOST_IP:-localhost}"
     print_msg "Access the web interface at:"

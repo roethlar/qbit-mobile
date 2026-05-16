@@ -76,17 +76,32 @@ npm start
 
 ## Configuration
 
-Edit the `.env` file to configure the connection to qBittorrent (the deploy script will help you create this interactively):
+Edit the `.env` file to configure the server (the deploy script writes one for you interactively):
 
 ```env
 NODE_ENV=production
 PORT=3000                      # Port for the web interface
-HOST=0.0.0.0                  # Host to bind to
-QBITTORRENT_HOST=localhost    # qBittorrent host
-QBITTORRENT_PORT=8080         # qBittorrent WebUI port
-QBITTORRENT_USERNAME=         # optional; leave blank for local bypass
-QBITTORRENT_PASSWORD=         # optional; leave blank for local bypass
+HOST=0.0.0.0                   # Host to bind to
+
+# App authentication
+AUTH_MODE=basic                # 'basic' (default) or 'disabled'
+APP_USERNAME=admin
+APP_PASSWORD=                  # required if AUTH_MODE=basic
+
+# Upstream qBittorrent
+QBITTORRENT_HOST=localhost
+QBITTORRENT_PORT=8080
+QBITTORRENT_USERNAME=          # optional; leave blank for local bypass
+QBITTORRENT_PASSWORD=
 ```
+
+### App authentication
+
+This app is designed to be reached from a phone on your LAN, so binding to `0.0.0.0` is the default. To keep that safe, `AUTH_MODE=basic` is enabled out of the box and the server refuses to start if `APP_USERNAME` / `APP_PASSWORD` are unset. `deploy.sh` will auto-generate a strong password if you leave the field blank during install and print it once at the end.
+
+`AUTH_MODE=disabled` is available for trusted-LAN setups where you've already gated access at the network or reverse-proxy layer. The server prints a loud warning at boot if it's disabled while bound to a non-loopback interface.
+
+The proxy only forwards a curated set of qBittorrent endpoints — `/torrents/info`, `/transfer/info`, `/app/preferences`, `/app/version`, `/app/webapiVersion`, `/torrents/{stop,start,delete,add}`, and `/app/setPreferences` (with a key allowlist). Dangerous endpoints like `/app/shutdown`, `/torrents/setLocation`, and `autorun_program` preferences are not reachable through the proxy even when authenticated.
 
 ### qBittorrent Configuration
 
@@ -95,6 +110,8 @@ For the best experience, configure qBittorrent to allow local authentication byp
 1. Open qBittorrent settings
 2. Go to Web UI section
 3. Enable "Bypass authentication for clients on localhost"
+
+The proxy auto-detects the qBittorrent Web API version and translates legacy endpoints, so qBittorrent 4.x (with `/torrents/pause` / `/torrents/resume`) and 5.x (with `/torrents/stop` / `/torrents/start`) both work without configuration.
 
 ## Development
 
@@ -151,6 +168,7 @@ If you encounter any issues, please report them on the [GitHub issues page](http
 
 ## Notes on Compatibility and Security
 
-- Dedicated user: The service runs as a dedicated system user `qbitmobile` rather than `nobody`, which improves compatibility on distributions like Arch and follows least-privilege best practices.
-- Permissions: The app directory `/opt/qbit-mobile` is owned by `qbitmobile:qbitmobile` with mode `750`, and the `.env` is `640`. This allows the service to read configuration while keeping it private from other users.
-- Write access: The service has write access only to the `dist/` directory (configured via systemd `ReadWritePaths`), and otherwise runs with systemd hardening options enabled.
+- Dedicated user: The service runs as a dedicated system user `qbitmobile` by default (the deploy script also offers `nobody`), which follows least-privilege best practices and improves compatibility on distributions like Arch.
+- Permissions: The app directory `/opt/qbit-mobile` is owned by the service user with mode `750`, and the `.env` is always `640` so the password is not world-readable.
+- systemd hardening: the unit file applies `NoNewPrivileges`, `ProtectSystem=strict`, `ProtectHome`, `ProtectKernel*`, `RestrictAddressFamilies=AF_INET AF_INET6`, an empty `CapabilityBoundingSet`, and a `@system-service` syscall filter. Use `systemd-analyze security qbit-mobile` to inspect.
+- App auth on by default: `AUTH_MODE=basic` is the default and the server refuses to boot without credentials. The proxy exposes only an allowlist of qBittorrent endpoints, so even an authenticated caller cannot reach `/app/shutdown` or set RCE-enabling preferences like `autorun_program`.

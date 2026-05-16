@@ -79,6 +79,10 @@ export const PAUSED_STATES: readonly TorrentState[] = ['pausedDL', 'pausedUP', '
 export const DOWNLOADING_STATES: readonly TorrentState[] = ['downloading', 'stalledDL', 'queuedDL', 'metaDL', 'forcedDL', 'forcedMetaDL', 'allocating'];
 export const SEEDING_STATES: readonly TorrentState[] = ['uploading', 'stalledUP', 'queuedUP', 'forcedUP'];
 
+export const PAUSED_STATES_SET: ReadonlySet<TorrentState> = new Set(PAUSED_STATES);
+export const DOWNLOADING_STATES_SET: ReadonlySet<TorrentState> = new Set(DOWNLOADING_STATES);
+export const SEEDING_STATES_SET: ReadonlySet<TorrentState> = new Set(SEEDING_STATES);
+
 export interface GlobalTransferInfo {
   alltime_dl: number;
   alltime_ul: number;

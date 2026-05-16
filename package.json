@@ -1,7 +1,7 @@
 {
   "name": "qbit-mobile",
   "version": "1.0.0",
-  "description": "iOS-optimized qBittorrent web frontend",
+  "description": "Mobile-friendly qBittorrent Web UI",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -23,8 +23,7 @@
     "lucide-react": "^0.441.0",
     "multer": "^2.0.2",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-router-dom": "^6.26.1"
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@types/node": "^20.19.39",

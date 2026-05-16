@@ -1,25 +1,26 @@
 import { useState, useMemo, useEffect } from 'react';
 import type { Torrent } from '../types/qbittorrent';
-import { getStateText } from '../utils/formatters';
+import { STATE_PRIORITY, getStateText } from '../utils/formatters';
 
-export type SortField = 'name' | 'size' | 'progress' | 'dlspeed' | 'upspeed' | 'added_on' | 'state';
-export type SortOrder = 'asc' | 'desc';
+const SORT_FIELDS = ['name', 'size', 'progress', 'dlspeed', 'upspeed', 'added_on', 'state'] as const;
+const SORT_ORDERS = ['asc', 'desc'] as const;
+
+export type SortField = typeof SORT_FIELDS[number];
+export type SortOrder = typeof SORT_ORDERS[number];
 
 export function useTorrentFilters(torrents: Torrent[]) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
   const [sortBy, setSortBy] = useState<SortField>(() => {
     const saved = localStorage.getItem('qbit-sort-by');
-    return (saved as SortField) || 'name';
+    return SORT_FIELDS.includes(saved as SortField) ? (saved as SortField) : 'name';
   });
   const [sortOrder, setSortOrder] = useState<SortOrder>(() => {
     const saved = localStorage.getItem('qbit-sort-order');
-    return (saved as SortOrder) || 'asc';
+    return SORT_ORDERS.includes(saved as SortOrder) ? (saved as SortOrder) : 'asc';
   });
   const [selectedTag, setSelectedTag] = useState<string>(() => {
     return localStorage.getItem('qbit-selected-tag') || '';
   });
-  const itemsPerPage = 5000;
 
   const availableTags = useMemo(() => {
     const tagSet = new Set<string>();
@@ -82,8 +83,8 @@ export function useTorrentFilters(torrents: Torrent[]) {
           bValue = b.added_on;
           break;
         case 'state':
-          aValue = getStateText(a.state);
-          bValue = getStateText(b.state);
+          aValue = STATE_PRIORITY[a.state] ?? 99;
+          bValue = STATE_PRIORITY[b.state] ?? 99;
           break;
         default:
           return 0;
@@ -102,13 +103,6 @@ export function useTorrentFilters(torrents: Torrent[]) {
 
     return sorted;
   }, [torrents, searchQuery, selectedTag, sortBy, sortOrder]);
-
-  const paginatedTorrents = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return filteredAndSortedTorrents.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredAndSortedTorrents, currentPage, itemsPerPage]);
-
-  const totalPages = Math.ceil(filteredAndSortedTorrents.length / itemsPerPage);
 
   useEffect(() => {
     localStorage.setItem('qbit-sort-by', sortBy);
@@ -129,22 +123,17 @@ export function useTorrentFilters(torrents: Torrent[]) {
       setSortBy(newSortBy);
       setSortOrder('asc');
     }
-    setCurrentPage(1);
   };
 
   return {
     searchQuery,
     setSearchQuery,
-    currentPage,
-    setCurrentPage,
     sortBy,
     sortOrder,
     selectedTag,
     setSelectedTag,
     availableTags,
     filteredAndSortedTorrents,
-    paginatedTorrents,
-    totalPages,
     handleSort,
   };
 }

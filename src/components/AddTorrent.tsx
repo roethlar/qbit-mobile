@@ -5,8 +5,8 @@ import { BottomSheet } from './Layout';
 interface AddTorrentProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddUrl: (url: string, options?: AddTorrentOptions) => void;
-  onAddFile: (file: File, options?: AddTorrentOptions) => void;
+  onAddUrl: (url: string, options?: AddTorrentOptions) => Promise<void>;
+  onAddFile: (file: File, options?: AddTorrentOptions) => Promise<void>;
 }
 
 export interface AddTorrentOptions {
@@ -25,8 +25,10 @@ export function AddTorrent({ isOpen, onClose, onAddUrl, onAddFile }: AddTorrentP
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [urlError, setUrlError] = useState('');
+  const [submitError, setSubmitError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmitUrl = (e: React.FormEvent) => {
+  const handleSubmitUrl = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = url.trim();
     if (!trimmed) return;
@@ -43,21 +45,37 @@ export function AddTorrent({ isOpen, onClose, onAddUrl, onAddFile }: AddTorrentP
     }
 
     setUrlError('');
-    onAddUrl(trimmed, options);
-    setUrl('');
-    setOptions({});
-    onClose();
+    setSubmitError('');
+    setSubmitting(true);
+    try {
+      await onAddUrl(trimmed, options);
+      setUrl('');
+      setOptions({});
+      onClose();
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Failed to add torrent');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      onAddFile(file, options);
+    if (!file) return;
+
+    setSubmitError('');
+    setSubmitting(true);
+    try {
+      await onAddFile(file, options);
       setOptions({});
       onClose();
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Failed to add torrent file');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -65,6 +83,8 @@ export function AddTorrent({ isOpen, onClose, onAddUrl, onAddFile }: AddTorrentP
     setUrl('');
     setOptions({});
     setActiveTab('url');
+    setSubmitError('');
+    setUrlError('');
     onClose();
   };
 
@@ -106,6 +126,12 @@ export function AddTorrent({ isOpen, onClose, onAddUrl, onAddFile }: AddTorrentP
           </button>
         </div>
 
+        {submitError && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl">
+            <p className="text-red-800 text-sm font-medium">{submitError}</p>
+          </div>
+        )}
+
         {activeTab === 'url' ? (
           <form onSubmit={handleSubmitUrl} className="space-y-4">
             <div>
@@ -120,12 +146,13 @@ export function AddTorrent({ isOpen, onClose, onAddUrl, onAddFile }: AddTorrentP
                 className={`w-full p-3 border rounded-xl resize-none text-sm ${urlError ? 'border-red-400' : 'border-gray-300'}`}
                 rows={3}
                 required
+                disabled={submitting}
               />
               {urlError && <p className="text-xs text-red-500 mt-1">{urlError}</p>}
             </div>
             <TorrentOptions options={options} onChange={setOptions} />
-            <button type="submit" className="w-full ios-button">
-              Add Torrent
+            <button type="submit" className="w-full ios-button" disabled={submitting}>
+              {submitting ? 'Adding…' : 'Add Torrent'}
             </button>
           </form>
         ) : (
@@ -136,13 +163,17 @@ export function AddTorrent({ isOpen, onClose, onAddUrl, onAddFile }: AddTorrentP
               accept=".torrent"
               onChange={handleFileChange}
               className="hidden"
+              disabled={submitting}
             />
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="w-full p-8 border-2 border-dashed border-gray-300 rounded-xl text-center hover:border-primary-400 transition-colors"
+              disabled={submitting}
+              className="w-full p-8 border-2 border-dashed border-gray-300 rounded-xl text-center hover:border-primary-400 transition-colors disabled:opacity-50"
             >
               <Upload className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-              <p className="text-gray-600 font-medium">Choose .torrent file</p>
+              <p className="text-gray-600 font-medium">
+                {submitting ? 'Adding…' : 'Choose .torrent file'}
+              </p>
               <p className="text-sm text-gray-500 mt-1">Tap to browse files</p>
             </button>
             <TorrentOptions options={options} onChange={setOptions} />
@@ -159,7 +190,7 @@ interface TorrentOptionsProps {
 }
 
 function TorrentOptions({ options, onChange }: TorrentOptionsProps) {
-  const updateOption = (key: keyof AddTorrentOptions, value: any) => {
+  const updateOption = <K extends keyof AddTorrentOptions>(key: K, value: AddTorrentOptions[K]) => {
     onChange({ ...options, [key]: value });
   };
 
@@ -167,7 +198,7 @@ function TorrentOptions({ options, onChange }: TorrentOptionsProps) {
     <div className="space-y-4">
       <div className="border-t border-gray-200 pt-4">
         <h3 className="text-sm font-medium text-gray-700 mb-3">Options</h3>
-        
+
         <div className="space-y-3">
           <div>
             <label htmlFor="savepath" className="block text-sm text-gray-600 mb-1">

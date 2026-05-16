@@ -5,10 +5,11 @@ export function useDirectTorrents() {
   return useQuery({
     queryKey: ['torrents'],
     queryFn: api.getTorrents,
-    refetchInterval: 5000,
+    refetchInterval: (q) => (q.state.error ? false : 5000),
+    refetchOnReconnect: true,
     staleTime: 3000,
     placeholderData: (previousData) => previousData,
-    retry: false, // Don't retry immediately on error
+    retry: false,
   });
 }
 
@@ -16,10 +17,11 @@ export function useDirectGlobalStats() {
   return useQuery({
     queryKey: ['global-stats'],
     queryFn: api.getGlobalStats,
-    refetchInterval: 5000,
+    refetchInterval: (q) => (q.state.error ? false : 5000),
+    refetchOnReconnect: true,
     staleTime: 3000,
     placeholderData: (previousData) => previousData,
-    retry: false, // Don't retry immediately on error
+    retry: false,
   });
 }
 

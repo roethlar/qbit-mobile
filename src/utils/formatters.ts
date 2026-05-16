@@ -1,11 +1,13 @@
+const INFINITE_SECONDS = 8640000;
+
 export function formatBytes(bytes: number, decimals = 2): string {
-  if (bytes === 0) return '0 B';
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
 
   const k = 1024;
   const dm = decimals < 0 ? 0 : decimals;
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
 
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
 
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
@@ -15,7 +17,7 @@ export function formatSpeed(bytesPerSecond: number): string {
 }
 
 export function formatTime(seconds: number): string {
-  if (seconds === 8640000 || seconds < 0) return '∞';
+  if (seconds === INFINITE_SECONDS || seconds < 0) return '∞';
   if (seconds === 0) return '0s';
 
   const hours = Math.floor(seconds / 3600);
@@ -92,6 +94,28 @@ export function getStateColor(state: string): string {
       return 'text-gray-600';
   }
 }
+
+export const STATE_PRIORITY: Record<string, number> = {
+  downloading: 1,
+  forcedDL: 1,
+  metaDL: 1,
+  forcedMetaDL: 1,
+  uploading: 2,
+  forcedUP: 2,
+  queuedDL: 3,
+  queuedUP: 3,
+  stalledDL: 4,
+  stalledUP: 4,
+  checkingDL: 5,
+  checkingUP: 5,
+  checkingResumeData: 5,
+  pausedDL: 6,
+  pausedUP: 6,
+  stoppedDL: 6,
+  stoppedUP: 6,
+  error: 7,
+  missingFiles: 7,
+};
 
 export function getStateText(state: string): string {
   switch (state) {

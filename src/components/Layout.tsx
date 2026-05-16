@@ -1,4 +1,5 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
+import { X } from 'lucide-react';
 import { clsx } from 'clsx';
 
 interface LayoutProps {
@@ -88,23 +89,40 @@ interface BottomSheetProps {
 }
 
 export function BottomSheet({ isOpen, onClose, title, children }: BottomSheetProps) {
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', handleKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end">
-      <div
-        className="fixed inset-0 bg-black/30 backdrop-blur-sm"
-        onClick={onClose}
-      />
+    <div
+      className="fixed inset-0 z-50 flex items-end bg-black/30 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title || 'Sheet'}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
       <div className="relative w-full bg-white dark:bg-gray-850 rounded-t-3xl shadow-xl max-h-[90vh] overflow-hidden">
         {title && (
           <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-700">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{title}</h2>
             <button
               onClick={onClose}
+              aria-label="Close"
               className="p-2 -mr-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
             >
-              ✕
+              <X className="w-5 h-5" aria-hidden="true" />
             </button>
           </div>
         )}

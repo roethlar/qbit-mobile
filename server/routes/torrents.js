@@ -1,20 +1,35 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { makeQbRequest } from '../qbClient.js';
+import FormData from 'form-data';
+import { makeQbRequest, getQbApiCapabilities } from '../qbClient.js';
 
 const router = Router();
+
 const upload = multer({
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10 MB per file
+    fileSize: 10 * 1024 * 1024,
     files: 25,
-    fields: 50,
+    fields: 30,
   },
 });
 
-// Wrap multer so its errors (e.g. LIMIT_FILE_SIZE) return a clean JSON
-// response instead of falling through to Express' default error handler.
-const uploadAny = (req, res, next) => {
-  upload.any()(req, res, err => {
+// Only forward fields the UI actually sets. Without this, callers could
+// pass arbitrary qBittorrent add-torrent parameters (savepath to anywhere,
+// rename, useAutoTMM, etc.) that the UI never exposes.
+const ALLOWED_ADD_FIELDS = new Set([
+  'urls',
+  'savepath',
+  'category',
+  'stopped',
+  'paused',
+  'skip_checking',
+  'sequentialDownload',
+  'firstLastPiecePrio',
+  'tags',
+]);
+
+const uploadFiles = (req, res, next) => {
+  upload.fields([{ name: 'torrents', maxCount: 25 }])(req, res, err => {
     if (!err) return next();
     if (err instanceof multer.MulterError) {
       const status = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
@@ -24,37 +39,49 @@ const uploadAny = (req, res, next) => {
   });
 };
 
-router.post('/torrents/add', uploadAny, async (req, res) => {
+function buildAddFormData(body, files) {
+  const formData = new FormData();
+  const caps = getQbApiCapabilities();
+
+  for (const [key, rawValue] of Object.entries(body || {})) {
+    if (!ALLOWED_ADD_FIELDS.has(key)) continue;
+    if (rawValue === undefined || rawValue === null || rawValue === '') continue;
+    const value = Array.isArray(rawValue) ? rawValue[0] : rawValue;
+    let outKey = key;
+    if (caps.legacy && key === 'stopped') outKey = 'paused';
+    else if (!caps.legacy && key === 'paused') outKey = 'stopped';
+    formData.append(outKey, String(value));
+  }
+
+  const torrentFiles = (files && files.torrents) || [];
+  for (const file of torrentFiles) {
+    formData.append('torrents', file.buffer, {
+      filename: file.originalname,
+      contentType: file.mimetype || 'application/x-bittorrent',
+    });
+  }
+
+  return formData;
+}
+
+router.post('/torrents/add', uploadFiles, async (req, res) => {
   try {
-    const FormData = (await import('form-data')).default;
-    const formData = new FormData();
-
-    Object.entries(req.body).forEach(([key, value]) => {
-      if (value !== undefined && value !== '') {
-        formData.append(key, value);
-      }
+    const response = await makeQbRequest('POST', '/torrents/add', () => {
+      const fd = buildAddFormData(req.body, req.files);
+      return { data: fd, headers: fd.getHeaders() };
     });
-
-    if (req.files && req.files.length > 0) {
-      req.files.forEach(file => {
-        formData.append(file.fieldname, file.buffer, {
-          filename: file.originalname,
-          contentType: file.mimetype
-        });
-      });
-    }
-
-    const response = await makeQbRequest('POST', '/torrents/add', formData, {
-      ...formData.getHeaders()
-    });
-
     res.status(response.status).send(response.data);
   } catch (error) {
-    console.error('Torrent upload error:', error.message);
     if (error.response) {
+      console.error(
+        `[proxy] POST /torrents/add -> upstream ${error.response.status}: ${error.message}`,
+      );
       res.status(error.response.status).send(error.response.data);
     } else {
-      res.status(500).json({ error: 'Upload failed' });
+      console.error(
+        `[proxy] POST /torrents/add -> ${error.code || 'error'}: ${error.message}`,
+      );
+      res.status(502).json({ error: 'Upload failed' });
     }
   }
 });
