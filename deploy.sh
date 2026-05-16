@@ -204,6 +204,67 @@ generate_password() {
     fi
 }
 
+prompt_app_auth() {
+    # Reads stdin, sets globals: AUTH_MODE, APP_USER, APP_PASS, PRINT_GENERATED_PASS.
+    # $1 (optional) is the bound HOST used in the disabled-mode warning.
+    local app_host="${1:-0.0.0.0}"
+    local app_auth_choice=""
+    local confirm_disabled=""
+
+    AUTH_MODE=""
+    APP_USER=""
+    APP_PASS=""
+
+    echo ""
+    print_msg "Web UI authentication setup:"
+    echo "1) Basic auth (recommended — required for anything beyond localhost)"
+    echo "2) Disabled (no auth — only safe on a fully trusted LAN)"
+    while true; do
+        read -r -p "Choose authentication method [1]: " app_auth_choice || true
+        case ${app_auth_choice:-1} in
+            1)
+                AUTH_MODE="basic"
+                APP_USER=$(prompt_with_default "Web UI username" "admin")
+                read -r -s -p "Web UI password (leave blank to auto-generate): " APP_PASS || true
+                echo
+                if [ -z "$APP_PASS" ]; then
+                    APP_PASS=$(generate_password)
+                    PRINT_GENERATED_PASS="$APP_PASS"
+                    print_msg "Generated a random password."
+                fi
+                break
+                ;;
+            2)
+                if [ "$app_host" != "127.0.0.1" ] && [ "$app_host" != "::1" ] && [ "$app_host" != "localhost" ]; then
+                    print_warning "AUTH_MODE=disabled with HOST=${app_host} means anyone on the network can drive qBittorrent."
+                    confirm_disabled=""
+                    read -r -p "Type 'yes' to confirm, anything else to choose again: " confirm_disabled || true
+                    if [ "$confirm_disabled" != "yes" ]; then
+                        continue
+                    fi
+                fi
+                AUTH_MODE="disabled"
+                APP_USER=""
+                APP_PASS=""
+                print_msg "Web UI auth disabled."
+                break
+                ;;
+            *)
+                print_warning "Invalid choice. Enter 1 or 2."
+                ;;
+        esac
+    done
+}
+
+append_auth_to_env() {
+    {
+        printf '\n# --- App authentication (added on upgrade) ---\n'
+        printf 'AUTH_MODE=%s\n' "${AUTH_MODE}"
+        printf 'APP_USERNAME=%s\n' "${APP_USER}"
+        printf 'APP_PASSWORD=%s\n' "${APP_PASS}"
+    } >> "${ENV_FILE}"
+}
+
 write_env_file() {
     local app_port="$1"
     local app_host="$2"
@@ -257,49 +318,7 @@ if [ "$overwrite_env" = true ]; then
     done
     APP_HOST=$(prompt_with_default "Web UI host to bind" "0.0.0.0")
 
-    echo ""
-    print_msg "Web UI authentication setup:"
-    echo "1) Basic auth (recommended — required for anything beyond localhost)"
-    echo "2) Disabled (no auth — only safe on a fully trusted LAN)"
-    AUTH_MODE=""
-    APP_USER=""
-    APP_PASS=""
-    app_auth_choice=""
-    while true; do
-        read -r -p "Choose authentication method [1]: " app_auth_choice || true
-        case ${app_auth_choice:-1} in
-            1)
-                AUTH_MODE="basic"
-                APP_USER=$(prompt_with_default "Web UI username" "admin")
-                read -r -s -p "Web UI password (leave blank to auto-generate): " APP_PASS || true
-                echo
-                if [ -z "$APP_PASS" ]; then
-                    APP_PASS=$(generate_password)
-                    PRINT_GENERATED_PASS="$APP_PASS"
-                    print_msg "Generated a random password."
-                fi
-                break
-                ;;
-            2)
-                if [ "$APP_HOST" != "127.0.0.1" ] && [ "$APP_HOST" != "::1" ] && [ "$APP_HOST" != "localhost" ]; then
-                    print_warning "AUTH_MODE=disabled with HOST=${APP_HOST} means anyone on the network can drive qBittorrent."
-                    confirm_disabled=""
-                    read -r -p "Type 'yes' to confirm, anything else to choose again: " confirm_disabled || true
-                    if [ "$confirm_disabled" != "yes" ]; then
-                        continue
-                    fi
-                fi
-                AUTH_MODE="disabled"
-                APP_USER=""
-                APP_PASS=""
-                print_msg "Web UI auth disabled."
-                break
-                ;;
-            *)
-                print_warning "Invalid choice. Enter 1 or 2."
-                ;;
-        esac
-    done
+    prompt_app_auth "$APP_HOST"
 
     echo ""
     QB_HOST=$(prompt_with_default "qBittorrent host" "localhost")
@@ -349,8 +368,15 @@ if [ "$overwrite_env" = true ]; then
 else
     print_msg ".env file already exists; keeping current values."
     if ! grep -qE '^AUTH_MODE=' "${ENV_FILE}"; then
-        print_warning "Existing .env has no AUTH_MODE. The server will default to AUTH_MODE=basic and refuse to start until APP_USERNAME/APP_PASSWORD are set."
-        print_warning "Edit ${ENV_FILE} manually, or rerun this script and choose to overwrite."
+        # Existing .env is from a pre-1.1 install. The 1.1 server refuses to
+        # boot without AUTH_MODE/APP_USERNAME/APP_PASSWORD, so we prompt for
+        # those and append them to the existing file (everything else stays).
+        print_warning "Your existing .env was created before v1.1 and is missing the"
+        print_warning "AUTH_MODE / APP_USERNAME / APP_PASSWORD keys that v1.1 requires."
+        existing_host=$(grep -E '^HOST=' "${ENV_FILE}" | head -n1 | cut -d= -f2- || true)
+        prompt_app_auth "${existing_host:-0.0.0.0}"
+        append_auth_to_env
+        print_msg "Added the new auth keys to ${ENV_FILE}."
     fi
 fi
 
@@ -465,6 +491,10 @@ if systemctl is-active --quiet "${SERVICE_NAME}"; then
     print_msg "  http://${HOST_IP}:${ENV_PORT}"
     print_msg "========================================="
 else
-    print_error "Service failed to start. Check logs with: journalctl -u ${SERVICE_NAME} -n 50"
+    print_error "Service failed to start. Recent logs:"
+    echo ""
+    journalctl -u "${SERVICE_NAME}" -n 25 --no-pager 2>&1 || true
+    echo ""
+    print_error "Full logs: journalctl -u ${SERVICE_NAME} -n 100"
     exit 1
 fi
