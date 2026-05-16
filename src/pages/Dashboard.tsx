@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
-import { Plus, Settings, RefreshCw, Moon, Sun, CheckSquare, Play, Pause, Trash2, X } from 'lucide-react';
+import { Plus, Settings, RefreshCw, Moon, Sun, CheckSquare, Play, Pause, Trash2, X, WifiOff } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { Layout, Header, FloatingActionButton } from '../components/Layout';
 import { CompactTorrentList } from '../components/CompactTorrentList';
 import { AddTorrent } from '../components/AddTorrent';
 import { TorrentDetail } from '../components/TorrentDetail';
 import { useDirectTorrents, useDirectGlobalStats, useDirectTorrentActions } from '../hooks/useDirectTorrents';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { formatSpeed } from '../utils/formatters';
 import {
   PAUSED_STATES_SET,
@@ -49,6 +50,7 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
   };
 
   const { toggleTheme, isDark } = useTheme();
+  const online = useOnlineStatus();
   const { data: torrents = [], isLoading, isError, refetch } = useDirectTorrents();
   const { data: globalStats } = useDirectGlobalStats();
   const {
@@ -214,6 +216,18 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
       ) : (
         <Header
           title="qBit Mobile"
+          leftButton={
+            !online ? (
+              <span
+                role="status"
+                aria-label="Offline"
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+              >
+                <WifiOff className="w-3 h-3" />
+                Offline
+              </span>
+            ) : undefined
+          }
           rightButton={
             <div className="flex items-center space-x-1">
               <button

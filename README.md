@@ -4,13 +4,13 @@ A modern, responsive web interface for qBittorrent optimized for mobile devices.
 
 ## Features
 
-- 📱 Mobile-first responsive design
-- ⚡ Fast and lightweight
-- 🌙 Dark mode support
-- 🔍 Search and filter torrents
-- 🏷️ Tag-based filtering
-- 📊 Real-time statistics
-- 🔄 Auto-refresh every 5 seconds
+- Mobile-first responsive design with dark mode
+- Virtualized torrent list (handles thousands of torrents smoothly)
+- Per-torrent detail drawer: files, trackers, transfer stats, recheck and reannounce
+- Batch selection mode for bulk pause / resume / delete
+- Search, sort, tag filtering, and live global stats
+- Installable PWA with offline shell (the UI loads from cache; live torrent data needs a connection)
+- HTTP Basic auth and an endpoint allowlist so the proxy can't drive the qBittorrent admin API beyond what the UI uses
 
 ## Requirements
 
