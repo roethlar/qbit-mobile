@@ -1,11 +1,18 @@
 import { useState, useRef, useCallback, memo } from 'react';
-import { Play, Pause, Trash2, MoreVertical, Search, X, ArrowUpDown, ArrowUp, ArrowDown, Tag, Check } from 'lucide-react';
+import {
+  Play, Pause, Trash2, RefreshCw, Radio,
+  Search, X, ArrowUpDown, ArrowUp, ArrowDown, Tag, Check, ChevronDown, ChevronRight,
+} from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { Torrent, TorrentState } from '../types/qbittorrent';
 import { PAUSED_STATES_SET } from '../types/qbittorrent';
-import { formatBytes, formatSpeed, formatProgress, getStateColor, getStateText } from '../utils/formatters';
+import {
+  formatBytes, formatSpeed, formatProgress, formatTime, formatRatio, formatDate,
+  getStateColor, getStateText,
+} from '../utils/formatters';
 import { BottomSheet } from './Layout';
 import type { SortField, SortOrder } from '../hooks/useTorrentFilters';
+import { useTorrentDetailActions } from '../hooks/useTorrentDetail';
 import { clsx } from 'clsx';
 
 const isPausedState = (state: TorrentState) => PAUSED_STATES_SET.has(state);
@@ -54,20 +61,22 @@ export function CompactTorrentList({
   onSelectedTagChange,
   availableTags,
 }: CompactTorrentListProps) {
-  const [selectedTorrent, setSelectedTorrent] = useState<Torrent | null>(null);
-  const [showActions, setShowActions] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [expandedHash, setExpandedHash] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Torrent | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   const [showTags, setShowTags] = useState(false);
   const [showSortOptions, setShowSortOptions] = useState(false);
+
+  const { recheck, reannounce } = useTorrentDetailActions();
 
   const parentRef = useRef<HTMLDivElement | null>(null);
   const rowVirtualizer = useVirtualizer({
     count: visibleTorrents.length,
     getScrollElement: () => parentRef.current,
-    // Rough average; measureElement adjusts per row as it scrolls into view.
+    // Rough average for collapsed rows; measureElement remeasures when a row
+    // expands (or collapses) so the virtualizer reflows around the new height.
     estimateSize: () => 46,
-    overscan: 8,
+    overscan: 6,
     getItemKey: index => visibleTorrents[index]?.hash ?? index,
   });
 
@@ -76,41 +85,38 @@ export function CompactTorrentList({
       onToggleSelect?.(torrent.hash);
       return;
     }
-    onTorrentClick?.(torrent);
-  }, [selectMode, onToggleSelect, onTorrentClick]);
-
-  const handleRowActionClick = useCallback((torrent: Torrent, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (selectMode) {
-      onToggleSelect?.(torrent.hash);
-      return;
-    }
-    setSelectedTorrent(torrent);
-    setShowActions(true);
+    setExpandedHash((prev) => (prev === torrent.hash ? null : torrent.hash));
   }, [selectMode, onToggleSelect]);
 
-  const handlePauseResume = () => {
-    if (!selectedTorrent) return;
-
-    if (isPausedState(selectedTorrent.state)) {
-      onResume(selectedTorrent.hash);
-    } else {
-      onPause(selectedTorrent.hash);
-    }
-    setShowActions(false);
-  };
-
-  const handleDeleteClick = () => {
-    setShowActions(false);
-    setShowDeleteConfirm(true);
-  };
+  const handleRowAction = useCallback(
+    (torrent: Torrent, action: 'toggle' | 'recheck' | 'reannounce' | 'delete' | 'detail') => {
+      switch (action) {
+        case 'toggle':
+          if (isPausedState(torrent.state)) onResume(torrent.hash);
+          else onPause(torrent.hash);
+          break;
+        case 'recheck':
+          recheck.mutate(torrent.hash);
+          break;
+        case 'reannounce':
+          reannounce.mutate(torrent.hash);
+          break;
+        case 'delete':
+          setPendingDelete(torrent);
+          break;
+        case 'detail':
+          onTorrentClick?.(torrent);
+          break;
+      }
+    },
+    [onPause, onResume, onTorrentClick, recheck, reannounce],
+  );
 
   const handleDelete = (deleteFiles: boolean) => {
-    if (selectedTorrent) {
-      onDelete(selectedTorrent.hash, deleteFiles);
+    if (pendingDelete) {
+      onDelete(pendingDelete.hash, deleteFiles);
     }
-    setShowDeleteConfirm(false);
-    setSelectedTorrent(null);
+    setPendingDelete(null);
   };
 
   if (unfilteredCount === 0) {
@@ -296,8 +302,11 @@ export function CompactTorrentList({
                   torrent={torrent}
                   selectMode={selectMode}
                   isSelected={isSelected}
+                  isExpanded={expandedHash === torrent.hash}
                   onClick={handleRowClick}
-                  onActionClick={handleRowActionClick}
+                  onAction={handleRowAction}
+                  recheckPending={recheck.isPending && recheck.variables === torrent.hash}
+                  reannouncePending={reannounce.isPending && reannounce.variables === torrent.hash}
                 />
               </div>
             );
@@ -306,43 +315,13 @@ export function CompactTorrentList({
       </div>
 
       <BottomSheet
-        isOpen={showActions}
-        onClose={() => setShowActions(false)}
-        title={selectedTorrent?.name}
-      >
-        <div className="p-4 space-y-2">
-          <button
-            onClick={handlePauseResume}
-            className="w-full flex items-center p-4 rounded-xl bg-gray-50 dark:bg-gray-700 active:bg-gray-100 dark:active:bg-gray-600 transition-colors"
-          >
-            {selectedTorrent && isPausedState(selectedTorrent.state) ? (
-              <Play className="w-5 h-5 mr-3 text-green-600" />
-            ) : (
-              <Pause className="w-5 h-5 mr-3 text-orange-600" />
-            )}
-            <span className="text-base font-medium">
-              {selectedTorrent && isPausedState(selectedTorrent.state) ? 'Resume' : 'Pause'}
-            </span>
-          </button>
-
-          <button
-            onClick={handleDeleteClick}
-            className="w-full flex items-center p-4 rounded-xl bg-red-50 dark:bg-red-900/20 active:bg-red-100 dark:active:bg-red-900/30 transition-colors"
-          >
-            <Trash2 className="w-5 h-5 mr-3 text-red-600" />
-            <span className="text-base font-medium text-red-600">Delete</span>
-          </button>
-        </div>
-      </BottomSheet>
-
-      <BottomSheet
-        isOpen={showDeleteConfirm}
-        onClose={() => setShowDeleteConfirm(false)}
+        isOpen={!!pendingDelete}
+        onClose={() => setPendingDelete(null)}
         title="Delete Torrent"
       >
         <div className="p-4 space-y-4">
-          <p className="text-gray-600">
-            Are you sure you want to delete "{selectedTorrent?.name}"?
+          <p className="text-gray-600 dark:text-gray-400">
+            Are you sure you want to delete "{pendingDelete?.name}"?
           </p>
 
           <div className="space-y-2">
@@ -361,7 +340,7 @@ export function CompactTorrentList({
             </button>
 
             <button
-              onClick={() => setShowDeleteConfirm(false)}
+              onClick={() => setPendingDelete(null)}
               className="w-full ios-button-secondary"
             >
               Cancel
@@ -373,20 +352,28 @@ export function CompactTorrentList({
   );
 }
 
+type RowAction = 'toggle' | 'recheck' | 'reannounce' | 'delete' | 'detail';
+
 interface CompactTorrentRowProps {
   torrent: Torrent;
   selectMode: boolean;
   isSelected: boolean;
+  isExpanded: boolean;
   onClick: (torrent: Torrent) => void;
-  onActionClick: (torrent: Torrent, e: React.MouseEvent) => void;
+  onAction: (torrent: Torrent, action: RowAction) => void;
+  recheckPending: boolean;
+  reannouncePending: boolean;
 }
 
 const CompactTorrentRow = memo(function CompactTorrentRow({
   torrent,
   selectMode,
   isSelected,
+  isExpanded,
   onClick,
-  onActionClick,
+  onAction,
+  recheckPending,
+  reannouncePending,
 }: CompactTorrentRowProps) {
   const isActive = torrent.state === 'downloading' || torrent.state === 'uploading';
   const isPaused = isPausedState(torrent.state);
@@ -397,7 +384,9 @@ const CompactTorrentRow = memo(function CompactTorrentRow({
         'border-b border-gray-100 dark:border-gray-700 px-2 py-1.5 transition-colors cursor-pointer',
         isSelected
           ? 'bg-primary-50 dark:bg-primary-900/20 border-l-2 border-l-primary-600'
-          : 'active:bg-gray-50 dark:active:bg-gray-700',
+          : isExpanded
+            ? 'bg-gray-50 dark:bg-gray-800'
+            : 'active:bg-gray-50 dark:active:bg-gray-700',
       )}
       onClick={() => onClick(torrent)}
     >
@@ -449,7 +438,7 @@ const CompactTorrentRow = memo(function CompactTorrentRow({
 
         {selectMode ? (
           <button
-            onClick={(e) => onActionClick(torrent, e)}
+            onClick={(e) => { e.stopPropagation(); onClick(torrent); }}
             aria-label={isSelected ? `Deselect ${torrent.name}` : `Select ${torrent.name}`}
             aria-pressed={isSelected}
             className={clsx(
@@ -462,15 +451,136 @@ const CompactTorrentRow = memo(function CompactTorrentRow({
             {isSelected && <Check className="w-4 h-4" />}
           </button>
         ) : (
-          <button
-            onClick={(e) => onActionClick(torrent, e)}
-            aria-label={`Actions for ${torrent.name}`}
-            className="p-2 -mr-2 text-gray-400 active:text-gray-600 transition-colors flex-shrink-0"
-          >
-            <MoreVertical className="w-4 h-4" />
-          </button>
+          <ChevronDown
+            className={clsx(
+              'w-4 h-4 text-gray-400 flex-shrink-0 transition-transform',
+              isExpanded && 'rotate-180',
+            )}
+            aria-hidden="true"
+          />
         )}
       </div>
+
+      {isExpanded && !selectMode && (
+        <ExpandedDetail
+          torrent={torrent}
+          isPaused={isPaused}
+          onAction={onAction}
+          recheckPending={recheckPending}
+          reannouncePending={reannouncePending}
+        />
+      )}
     </div>
   );
 });
+
+interface ExpandedDetailProps {
+  torrent: Torrent;
+  isPaused: boolean;
+  onAction: (torrent: Torrent, action: RowAction) => void;
+  recheckPending: boolean;
+  reannouncePending: boolean;
+}
+
+function ExpandedDetail({ torrent, isPaused, onAction, recheckPending, reannouncePending }: ExpandedDetailProps) {
+  // Stop click bubble: tapping inside the expansion shouldn't collapse the row.
+  return (
+    <div
+      className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-600 space-y-2"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+        <Stat label="ETA" value={formatTime(torrent.eta)} />
+        <Stat label="Ratio" value={formatRatio(torrent.ratio)} />
+        <Stat label="Seeds" value={`${torrent.num_seeds} / ${torrent.num_complete}`} />
+        <Stat label="Peers" value={`${torrent.num_leechs} / ${torrent.num_incomplete}`} />
+        <Stat label="Added" value={formatDate(torrent.added_on)} />
+        <Stat
+          label="Completed"
+          value={torrent.completion_on > 0 ? formatDate(torrent.completion_on) : '—'}
+        />
+        <div className="col-span-2 flex gap-2">
+          <dt className="text-gray-500 dark:text-gray-400 flex-shrink-0">Path</dt>
+          <dd className="text-gray-900 dark:text-gray-100 truncate selectable" title={torrent.save_path}>
+            {torrent.save_path || '—'}
+          </dd>
+        </div>
+      </dl>
+
+      <div className="grid grid-cols-4 gap-1 pt-1">
+        <ActionButton
+          label={isPaused ? 'Resume' : 'Pause'}
+          icon={isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
+          tone={isPaused ? 'positive' : 'neutral'}
+          onClick={() => onAction(torrent, 'toggle')}
+        />
+        <ActionButton
+          label="Recheck"
+          icon={<RefreshCw className={clsx('w-4 h-4', recheckPending && 'animate-spin')} />}
+          onClick={() => onAction(torrent, 'recheck')}
+          disabled={recheckPending}
+        />
+        <ActionButton
+          label="Reannounce"
+          icon={<Radio className={clsx('w-4 h-4', reannouncePending && 'animate-pulse')} />}
+          onClick={() => onAction(torrent, 'reannounce')}
+          disabled={reannouncePending}
+        />
+        <ActionButton
+          label="Delete"
+          icon={<Trash2 className="w-4 h-4" />}
+          tone="danger"
+          onClick={() => onAction(torrent, 'delete')}
+        />
+      </div>
+
+      <button
+        onClick={() => onAction(torrent, 'detail')}
+        className="w-full flex items-center justify-center gap-1 py-1.5 text-[11px] text-primary-600 dark:text-primary-400 active:bg-gray-100 dark:active:bg-gray-700 rounded"
+      >
+        View files &amp; trackers
+        <ChevronRight className="w-3 h-3" />
+      </button>
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <>
+      <dt className="text-gray-500 dark:text-gray-400">{label}</dt>
+      <dd className="text-gray-900 dark:text-gray-100 text-right selectable">{value}</dd>
+    </>
+  );
+}
+
+interface ActionButtonProps {
+  label: string;
+  icon: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  tone?: 'neutral' | 'positive' | 'danger';
+}
+
+function ActionButton({ label, icon, onClick, disabled, tone = 'neutral' }: ActionButtonProps) {
+  const toneClasses =
+    tone === 'danger'
+      ? 'text-red-600 dark:text-red-400 active:bg-red-50 dark:active:bg-red-900/20'
+      : tone === 'positive'
+        ? 'text-green-600 dark:text-green-400 active:bg-green-50 dark:active:bg-green-900/20'
+        : 'text-gray-700 dark:text-gray-200 active:bg-gray-100 dark:active:bg-gray-700';
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      className={clsx(
+        'flex flex-col items-center justify-center py-1.5 rounded-lg transition-colors disabled:opacity-50',
+        toneClasses,
+      )}
+    >
+      {icon}
+      <span className="text-[10px] mt-0.5">{label}</span>
+    </button>
+  );
+}
