@@ -9,6 +9,8 @@ process.env.APP_USERNAME = 'tester';
 process.env.APP_PASSWORD = 'testpw';
 process.env.QBITTORRENT_HOST = '127.0.0.1';
 process.env.QBITTORRENT_PORT = '18080';
+// Don't rate-limit tests; the suite makes many calls from a single IP.
+process.env.RATE_LIMIT = 'disabled';
 
 // Per-run temp DATA_DIR so the locations test doesn't poke at the developer's
 // /opt/qbit-mobile/data (which may not exist) or a colocated ./data.

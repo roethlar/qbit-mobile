@@ -11,7 +11,7 @@ const axios = (await import('axios')).default;
 const axiosMock = vi.mocked(axios);
 
 const { app } = await import('../server.js');
-const { __resetCapabilitiesForTests } = await import('../qbClient.js');
+const { __resetCapabilitiesForTests, confirmLegacyMode } = await import('../qbClient.js');
 const { __resetForTests: __resetLocationsForTests, saveLocations } = await import('../locations.js');
 
 const LOCATIONS_FILE = path.join(process.env.DATA_DIR, 'locations.json');
@@ -561,6 +561,108 @@ describe('qB4 404 fallback for stop/start', () => {
     const calls = axiosMock.mock.calls.map((c) => c[0].url);
     // No /erase, /pause, /resume etc — delete has no legacy alias.
     expect(calls.filter((u) => u.includes('/torrents/'))).toHaveLength(1);
+  });
+});
+
+describe('POST /torrents/add (multipart)', () => {
+  // FormData from form-data exposes getBuffer() synchronously once finalized;
+  // in normal use axios would stream it. The mock receives the live instance,
+  // so we read it directly to inspect what would have been transmitted.
+  function readFormBody(formData) {
+    if (!formData || typeof formData.getBuffer !== 'function') return '';
+    try {
+      return formData.getBuffer().toString('utf8');
+    } catch {
+      return '';
+    }
+  }
+
+  it('forwards a single .torrent file with 200', async () => {
+    const res = await request(app)
+      .post('/api/v2/torrents/add')
+      .auth(...CREDS)
+      .attach('torrents', Buffer.from('d8:announce4:teste'), {
+        filename: 'demo.torrent',
+        contentType: 'application/x-bittorrent',
+      });
+    expect(res.status).toBe(200);
+    const call = axiosMock.mock.calls[axiosMock.mock.calls.length - 1][0];
+    expect(call.url).toContain('/torrents/add');
+    expect(call.method).toBe('POST');
+    const body = readFormBody(call.data);
+    expect(body).toContain('filename="demo.torrent"');
+  });
+
+  it('rebuilds the FormData on a 401 retry and ends with 200', async () => {
+    let n = 0;
+    axiosMock.mockImplementation(async (config) => {
+      n++;
+      if (config.url.includes('/torrents/add') && n === 1) {
+        return { status: 401, data: '', headers: {} };
+      }
+      if (config.url.includes('/auth/login')) {
+        return { status: 200, data: 'Ok.', headers: {} };
+      }
+      return { status: 200, data: '', headers: {} };
+    });
+    const res = await request(app)
+      .post('/api/v2/torrents/add')
+      .auth(...CREDS)
+      .attach('torrents', Buffer.from('d8:announce4:teste'), {
+        filename: 'demo.torrent',
+        contentType: 'application/x-bittorrent',
+      });
+    expect(res.status).toBe(200);
+    const addCalls = axiosMock.mock.calls.filter((c) => c[0].url.includes('/torrents/add'));
+    // Factory invoked twice: original + post-relogin retry.
+    expect(addCalls).toHaveLength(2);
+    for (const c of addCalls) {
+      // Each call must actually carry a body — i.e. the factory rebuilt the
+      // FormData rather than reusing an already-consumed stream.
+      expect(c[0].data).toBeDefined();
+      const body = readFormBody(c[0].data);
+      expect(body).toContain('filename="demo.torrent"');
+    }
+  });
+
+  it('drops unknown fields (autorun_program) but keeps urls', async () => {
+    const res = await request(app)
+      .post('/api/v2/torrents/add')
+      .auth(...CREDS)
+      .field('urls', 'magnet:?xt=urn:btih:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
+      .field('autorun_program', '/bin/sh');
+    expect(res.status).toBe(200);
+    const call = axiosMock.mock.calls[axiosMock.mock.calls.length - 1][0];
+    const body = readFormBody(call.data);
+    expect(body).toContain('name="urls"');
+    expect(body).not.toContain('autorun_program');
+  });
+
+  it('qB5 path forwards stopped=true as stopped=true', async () => {
+    const res = await request(app)
+      .post('/api/v2/torrents/add')
+      .auth(...CREDS)
+      .field('urls', 'magnet:?xt=urn:btih:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb')
+      .field('stopped', 'true');
+    expect(res.status).toBe(200);
+    const call = axiosMock.mock.calls[axiosMock.mock.calls.length - 1][0];
+    const body = readFormBody(call.data);
+    expect(body).toContain('name="stopped"');
+    expect(body).not.toMatch(/name="paused"/);
+  });
+
+  it('qB4 path translates stopped=true into paused=true', async () => {
+    confirmLegacyMode();
+    const res = await request(app)
+      .post('/api/v2/torrents/add')
+      .auth(...CREDS)
+      .field('urls', 'magnet:?xt=urn:btih:cccccccccccccccccccccccccccccccccccccccc')
+      .field('stopped', 'true');
+    expect(res.status).toBe(200);
+    const call = axiosMock.mock.calls[axiosMock.mock.calls.length - 1][0];
+    const body = readFormBody(call.data);
+    expect(body).toContain('name="paused"');
+    expect(body).not.toMatch(/name="stopped"/);
   });
 });
 

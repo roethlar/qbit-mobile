@@ -3,6 +3,7 @@
 import 'dotenv/config';
 import crypto from 'crypto';
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath, pathToFileURL } from 'url';
@@ -124,7 +125,7 @@ app.use('/api', (req, res, next) => {
 
   if (isAllowedCrossOrigin) {
     res.header('Access-Control-Allow-Origin', allowedOrigin);
-    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Vary', 'Origin');
@@ -140,6 +141,28 @@ app.use('/api', (req, res, next) => {
 
   next();
 });
+
+// Rate limiting — mounted before auth so unauthenticated bursts are capped.
+// RATE_LIMIT=disabled turns it off for tests / dev.
+if (process.env.RATE_LIMIT !== 'disabled') {
+  const generalLimiter = rateLimit({
+    windowMs: 60_000,
+    limit: 100,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+  });
+  const authFailureLimiter = rateLimit({
+    windowMs: 60_000,
+    limit: 10,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    // Only failures count, so a logged-in client isn't throttled by its own
+    // legitimate traffic; brute-force probes still hit the cap quickly.
+    skipSuccessfulRequests: true,
+  });
+  app.use('/api', generalLimiter);
+  app.use('/api', authFailureLimiter);
+}
 
 if (AUTH_MODE === 'basic') {
   app.use('/api', requireBasicAuth);
@@ -273,7 +296,29 @@ function takeHashQuery(req, res) {
 // Read endpoints (no per-torrent params)
 app.get('/api/v2/torrents/info', (req, res) => proxyGet(req, res, '/torrents/info'));
 app.get('/api/v2/transfer/info', (req, res) => proxyGet(req, res, '/transfer/info'));
-app.get('/api/v2/app/preferences', (req, res) => proxyGet(req, res, '/app/preferences'));
+// On qB4, the response carries start_paused_enabled but the UI reads
+// add_stopped_enabled (the qB5 name). Mirror the key so reads work cross-
+// version without changing the frontend.
+app.get('/api/v2/app/preferences', async (req, res) => {
+  try {
+    const response = await makeQbRequest('GET', '/app/preferences', undefined, {});
+    const caps = getQbApiCapabilities();
+    let data = response.data;
+    if (
+      caps.legacy &&
+      data &&
+      typeof data === 'object' &&
+      !Array.isArray(data) &&
+      'start_paused_enabled' in data &&
+      !('add_stopped_enabled' in data)
+    ) {
+      data = { ...data, add_stopped_enabled: data.start_paused_enabled };
+    }
+    res.status(response.status).send(data);
+  } catch (error) {
+    forwardError(res, error, 'GET /app/preferences');
+  }
+});
 app.get('/api/v2/app/version', (req, res) => proxyGet(req, res, '/app/version'));
 app.get('/api/v2/app/webapiVersion', (req, res) => proxyGet(req, res, '/app/webapiVersion'));
 
@@ -326,6 +371,13 @@ app.post('/api/v2/torrents/setLocation', (req, res) => {
   if (typeof location !== 'string' || location.trim() === '') {
     return res.status(400).json({ error: 'Missing or empty "location"' });
   }
+  if (location.length > 4096) {
+    return res.status(400).json({ error: 'Location too long' });
+  }
+  // eslint-disable-next-line no-control-regex
+  if (/[\x00-\x1f]/.test(location)) {
+    return res.status(400).json({ error: 'Location contains control characters' });
+  }
   proxyFormPost(req, res, '/torrents/setLocation');
 });
 
@@ -373,8 +425,23 @@ app.post('/api/v2/app/setPreferences', async (req, res) => {
     return res.status(400).json({ error: 'Expected JSON object' });
   }
   const filtered = {};
+  const MAX_I32 = 2_147_483_647;
   for (const [key, value] of Object.entries(parsed)) {
-    if (ALLOWED_SET_PREF_KEYS.has(key)) filtered[key] = value;
+    if (!ALLOWED_SET_PREF_KEYS.has(key)) continue;
+    if (key === 'dl_limit' || key === 'up_limit') {
+      if (!Number.isInteger(value) || value < 0 || value > MAX_I32) {
+        return res.status(400).json({ error: `Invalid value for "${key}"` });
+      }
+    } else if (key === 'save_path') {
+      if (typeof value !== 'string' || value.length > 4096 || /[\0\r\n]/.test(value)) {
+        return res.status(400).json({ error: 'Invalid value for "save_path"' });
+      }
+    } else if (key === 'add_stopped_enabled') {
+      if (typeof value !== 'boolean') {
+        return res.status(400).json({ error: 'Invalid value for "add_stopped_enabled"' });
+      }
+    }
+    filtered[key] = value;
   }
   const caps = getQbApiCapabilities();
   if (caps.legacy && 'add_stopped_enabled' in filtered) {

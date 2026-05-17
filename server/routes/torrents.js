@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import FormData from 'form-data';
-import { makeQbRequest } from '../qbClient.js';
+import { makeQbRequest, getQbApiCapabilities } from '../qbClient.js';
 
 const router = Router();
 
@@ -41,15 +41,20 @@ const uploadFiles = (req, res, next) => {
 
 function buildAddFormData(body, files) {
   const formData = new FormData();
+  const caps = getQbApiCapabilities();
 
   for (const [key, rawValue] of Object.entries(body || {})) {
     if (!ALLOWED_ADD_FIELDS.has(key)) continue;
     if (rawValue === undefined || rawValue === null || rawValue === '') continue;
     const value = Array.isArray(rawValue) ? rawValue[0] : rawValue;
-    // The frontend uses qB5's "stopped" name, but qB 4.x and the current qB
-    // 5.x WebUI API both still accept the original "paused" parameter. Send
-    // that to keep behavior consistent across versions.
-    const outKey = key === 'stopped' ? 'paused' : key;
+    // qB5 parses "stopped"; qB4 parses "paused". Map based on detected caps;
+    // modern (or unknown) defaults to passing "stopped" through unchanged.
+    let outKey = key;
+    if (caps.legacy) {
+      if (key === 'stopped') outKey = 'paused';
+    } else {
+      if (key === 'paused') outKey = 'stopped';
+    }
     formData.append(outKey, String(value));
   }
 
@@ -85,5 +90,11 @@ router.post('/torrents/add', uploadFiles, async (req, res) => {
     }
   }
 });
+
+// Defense in depth: any future route added to this file must go through
+// the validateHashes/takeHashQuery gates in server.js, not slip in here.
+// Scoped to /torrents/* so the router doesn't shadow sibling /api/v2/app/*
+// endpoints registered after it in server.js.
+router.use('/torrents', (req, res) => res.status(404).json({ error: 'API endpoint not found' }));
 
 export default router;

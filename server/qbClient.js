@@ -10,6 +10,8 @@ let loginInFlight = null;
 
 let qbApiVersion = null;
 let capsDetected = false;
+let detectInFlight = null;
+let lastDetectAttemptAt = 0;
 // qBittorrent <5.0 (Web API <2.11) uses /torrents/pause and /resume instead of
 // /stop and /start. The preference key is "start_paused_enabled" instead of
 // "add_stopped_enabled". (The add-torrent param is normalized to "paused" on
@@ -51,7 +53,7 @@ async function performLogin() {
     }
   }
 
-  if (loginResponse.data === 'Ok.') {
+  if (typeof loginResponse.data === 'string' && loginResponse.data.trim() === 'Ok.') {
     // Local-bypass mode: no cookie issued, but the upstream will accept us
     // based on the source address.
     sessionCookie = '';
@@ -88,28 +90,38 @@ function parseVersionTuple(s) {
 }
 
 async function detectCapabilities() {
-  try {
-    const response = await axios({
-      method: 'GET',
-      url: `http://${qbHost}:${qbPort}/api/v2/app/webapiVersion`,
-      headers: { Cookie: sessionCookie || '' },
-      timeout: 10_000,
-      validateStatus: () => true,
-    });
-    if (response.status >= 200 && response.status < 300) {
-      const raw = typeof response.data === 'string' ? response.data.trim() : '';
-      qbApiVersion = raw;
-      const v = parseVersionTuple(raw);
-      qbApiCapabilities.legacy = !!(v && (v[0] < 2 || (v[0] === 2 && v[1] < 11)));
-      capsDetected = true;
-      console.log(
-        `qBittorrent Web API: ${qbApiVersion}` +
-          (qbApiCapabilities.legacy ? ' (legacy pause/resume mode)' : ''),
-      );
+  // Skip if a previous probe (or confirmLegacyMode) already settled the flag,
+  // otherwise a late-returning probe could overwrite a confirmed legacy=true.
+  if (capsDetected) return;
+  if (detectInFlight) return detectInFlight;
+  detectInFlight = (async () => {
+    lastDetectAttemptAt = Date.now();
+    try {
+      const response = await axios({
+        method: 'GET',
+        url: `http://${qbHost}:${qbPort}/api/v2/app/webapiVersion`,
+        headers: { Cookie: sessionCookie || '' },
+        timeout: 10_000,
+        validateStatus: () => true,
+      });
+      if (response.status >= 200 && response.status < 300) {
+        const raw = typeof response.data === 'string' ? response.data.trim() : '';
+        qbApiVersion = raw;
+        const v = parseVersionTuple(raw);
+        qbApiCapabilities.legacy = !!(v && (v[0] < 2 || (v[0] === 2 && v[1] < 11)));
+        capsDetected = true;
+        console.log(
+          `qBittorrent Web API: ${qbApiVersion}` +
+            (qbApiCapabilities.legacy ? ' (legacy pause/resume mode)' : ''),
+        );
+      }
+    } catch {
+      // Leave capsDetected=false so the next successful login retries.
     }
-  } catch {
-    // Leave capsDetected=false so the next successful login retries.
-  }
+  })().finally(() => {
+    detectInFlight = null;
+  });
+  return detectInFlight;
 }
 
 export function getQbApiCapabilities() {
@@ -141,6 +153,8 @@ export function __resetCapabilitiesForTests() {
   qbApiVersion = null;
   sessionCookie = null;
   loginInFlight = null;
+  detectInFlight = null;
+  lastDetectAttemptAt = 0;
 }
 
 // `dataOrFactory` may be a value (string/Buffer/URLSearchParams) OR a
@@ -169,7 +183,10 @@ export async function makeQbRequest(method, path, dataOrFactory, headers = {}) {
       timeout: 30_000,
       // Let callers decide how to handle 4xx; only throw on network errors.
       validateStatus: () => true,
-      maxBodyLength: 50 * 1024 * 1024,
+      // multer enforces the real upload cap (25 × 10MB); don't let axios
+      // truncate inside that ceiling.
+      maxBodyLength: Infinity,
+      maxContentLength: Infinity,
     };
     if (data !== undefined) config.data = data;
     return config;
@@ -188,20 +205,17 @@ export async function makeQbRequest(method, path, dataOrFactory, headers = {}) {
     response = await axios(buildConfig());
   }
 
-  const setCookie = response.headers['set-cookie'];
-  if (setCookie) {
-    const cookies = Array.isArray(setCookie) ? setCookie : [setCookie];
-    const sid = cookies.find(c => /^SID(\d+)?=/.test(c));
-    if (sid) {
-      sessionCookie = sid.split(';')[0];
-    }
-  }
-
   // Lazy capability detection: in local-bypass mode the upstream never
   // returns 401, so re-login isn't triggered and finalizeLogin can't run.
   // If we haven't detected yet, kick it off on the first non-error reply.
-  // Fire-and-forget so the response isn't delayed.
-  if (!capsDetected && response.status < 500) {
+  // Fire-and-forget so the response isn't delayed. Back off after a failed
+  // probe so a broken upstream doesn't trigger a probe on every request.
+  if (
+    !capsDetected &&
+    !detectInFlight &&
+    response.status < 500 &&
+    Date.now() - lastDetectAttemptAt > 30_000
+  ) {
     detectCapabilities().catch(() => { /* retried next request */ });
   }
 
