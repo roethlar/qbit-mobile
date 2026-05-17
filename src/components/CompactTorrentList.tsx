@@ -524,7 +524,7 @@ function ExpandedDetail({ torrent, isPaused, onAction, recheckPending, reannounc
         </div>
       </dl>
 
-      <div className="grid grid-cols-3 gap-1 pt-1">
+      <div className="grid grid-cols-6 gap-1 pt-1">
         <ActionButton
           label={isPaused ? 'Resume' : 'Pause'}
           icon={isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
@@ -593,13 +593,15 @@ function ActionButton({ label, icon, onClick, disabled, tone = 'neutral' }: Acti
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
+      // min-w-0 + truncate lets the longest label ("Reannounce") clip
+      // gracefully on a narrow phone instead of forcing the grid wider.
       className={clsx(
-        'flex flex-col items-center justify-center py-1.5 rounded-lg transition-colors disabled:opacity-50',
+        'flex flex-col items-center justify-center py-1.5 px-1 rounded-lg transition-colors disabled:opacity-50 min-w-0',
         toneClasses,
       )}
     >
       {icon}
-      <span className="text-[10px] mt-0.5">{label}</span>
+      <span className="text-[10px] mt-0.5 w-full text-center truncate">{label}</span>
     </button>
   );
 }
