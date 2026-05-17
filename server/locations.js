@@ -19,6 +19,11 @@ const MAX_PATH_LENGTH = 512;
 // Reset between tests via __resetForTests.
 let cache = null;
 
+// Serializes saveLocations so two concurrent PUT /api/locations calls don't
+// race on the temp/rename file write. The chain swallows errors so one
+// failed write doesn't poison subsequent ones.
+let writeChain = Promise.resolve();
+
 export class LocationsValidationError extends Error {
   constructor(message) {
     super(message);
@@ -44,6 +49,20 @@ function parseEnvSeed(raw) {
     .filter(Boolean);
 }
 
+// loadLocations() runs the same validation as saveLocations() over whatever
+// source it picks up — a manually-edited locations.json or an oversized env
+// seed shouldn't get a free pass past the rules the UI enforces. If the
+// loaded data fails validation, log + fall back to an empty list so the app
+// stays usable and the operator can fix the source.
+function safeValidate(raw, source) {
+  try {
+    return validate(raw);
+  } catch (err) {
+    console.warn(`[locations] invalid ${source}, ignoring:`, err.message);
+    return [];
+  }
+}
+
 export async function loadLocations() {
   if (cache !== null) return cache;
   if (existsSync(LOCATIONS_FILE)) {
@@ -51,7 +70,7 @@ export async function loadLocations() {
       const raw = await fs.readFile(LOCATIONS_FILE, 'utf8');
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed?.locations)) {
-        cache = parsed.locations;
+        cache = safeValidate(parsed.locations, 'locations.json');
         return cache;
       }
       console.warn('[locations] locations.json has unexpected shape; ignoring');
@@ -59,7 +78,7 @@ export async function loadLocations() {
       console.warn('[locations] failed to read locations.json:', err.message);
     }
   }
-  cache = parseEnvSeed(process.env.DOWNLOAD_LOCATIONS || '');
+  cache = safeValidate(parseEnvSeed(process.env.DOWNLOAD_LOCATIONS || ''), 'DOWNLOAD_LOCATIONS env');
   return cache;
 }
 
@@ -103,16 +122,24 @@ function validate(list) {
 }
 
 export async function saveLocations(list) {
+  // Validate eagerly so callers get the ValidationError synchronously rather
+  // than waiting on the queued write.
   const cleaned = validate(list);
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  // Atomic write: tmp + rename so a crash mid-write can't leave a half-file.
-  const tmp = LOCATIONS_FILE + '.tmp';
-  await fs.writeFile(tmp, JSON.stringify({ locations: cleaned }, null, 2), { mode: 0o640 });
-  await fs.rename(tmp, LOCATIONS_FILE);
-  cache = cleaned;
+  const work = writeChain.then(async () => {
+    await fs.mkdir(DATA_DIR, { recursive: true });
+    // Atomic write: tmp + rename so a crash mid-write can't leave a half-file.
+    await fs.writeFile(LOCATIONS_FILE + '.tmp', JSON.stringify({ locations: cleaned }, null, 2), { mode: 0o640 });
+    await fs.rename(LOCATIONS_FILE + '.tmp', LOCATIONS_FILE);
+    cache = cleaned;
+  });
+  // Don't poison the chain if this write fails — subsequent writes should
+  // still proceed. The error still propagates via the awaited `work` below.
+  writeChain = work.catch(() => undefined);
+  await work;
   return cleaned;
 }
 
 export function __resetForTests() {
   cache = null;
+  writeChain = Promise.resolve();
 }

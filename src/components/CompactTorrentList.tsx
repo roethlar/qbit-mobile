@@ -459,6 +459,15 @@ const CompactTorrentRow = memo(function CompactTorrentRow({
     setSwipeDx(0);
   };
 
+  // Browser-initiated cancellation (system gesture, alert popup, etc.) is not
+  // a "user committed the swipe" signal — just snap back without firing the
+  // action even if dx had crossed the threshold.
+  const handleTouchCancel = () => {
+    startRef.current = null;
+    setIsDragging(false);
+    setSwipeDx(0);
+  };
+
   const handleRowClickGuarded = () => {
     // A committed swipe also fires a synthetic click on touchend. Suppress one
     // click after a swipe so it doesn't immediately expand the row.
@@ -506,7 +515,7 @@ const CompactTorrentRow = memo(function CompactTorrentRow({
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        onTouchCancel={handleTouchEnd}
+        onTouchCancel={handleTouchCancel}
         onClick={handleRowClickGuarded}
         style={{
           transform: `translateX(${swipeDx}px)`,

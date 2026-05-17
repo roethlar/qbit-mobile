@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import request from 'supertest';
+import * as fs from 'fs';
+import * as path from 'path';
 
 vi.mock('axios', () => ({
   default: vi.fn(),
@@ -10,7 +12,18 @@ const axiosMock = vi.mocked(axios);
 
 const { app } = await import('../server.js');
 const { __resetCapabilitiesForTests } = await import('../qbClient.js');
-const { __resetForTests: __resetLocationsForTests } = await import('../locations.js');
+const { __resetForTests: __resetLocationsForTests, saveLocations } = await import('../locations.js');
+
+const LOCATIONS_FILE = path.join(process.env.DATA_DIR, 'locations.json');
+
+function writeRawLocationsFile(payload) {
+  fs.mkdirSync(process.env.DATA_DIR, { recursive: true });
+  fs.writeFileSync(LOCATIONS_FILE, JSON.stringify(payload));
+}
+
+function clearLocationsFile() {
+  try { fs.unlinkSync(LOCATIONS_FILE); } catch { /* not present */ }
+}
 
 const CREDS = ['tester', 'testpw'];
 
@@ -23,6 +36,8 @@ beforeEach(() => {
   // locations.js caches loaded entries in-memory; reset so each test starts
   // from the env seed or empty file.
   __resetLocationsForTests();
+  clearLocationsFile();
+  delete process.env.DOWNLOAD_LOCATIONS;
 });
 
 describe('app auth', () => {
@@ -330,6 +345,45 @@ describe('location presets endpoint', () => {
       .set('Content-Type', 'application/json')
       .send({ locations: [] });
     expect(res.status).toBe(401);
+  });
+
+  it('load drops a corrupt on-disk list (too many entries) and returns []', async () => {
+    // Bypass saveLocations so the invalid payload actually lands on disk.
+    writeRawLocationsFile({
+      locations: Array.from({ length: 100 }, (_, i) => ({ name: `n${i}`, path: `/p${i}` })),
+    });
+    const res = await request(app).get('/api/locations').auth(...CREDS);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ locations: [] });
+  });
+
+  it('load drops a corrupt on-disk list (duplicate names) and returns []', async () => {
+    writeRawLocationsFile({
+      locations: [
+        { name: 'Movies', path: '/a' },
+        { name: 'Movies', path: '/b' },
+      ],
+    });
+    const res = await request(app).get('/api/locations').auth(...CREDS);
+    expect(res.body).toEqual({ locations: [] });
+  });
+
+  it('load drops a bad env seed (duplicate names) and returns []', async () => {
+    process.env.DOWNLOAD_LOCATIONS = 'Movies=/a|Movies=/b';
+    const res = await request(app).get('/api/locations').auth(...CREDS);
+    expect(res.body).toEqual({ locations: [] });
+  });
+
+  it('concurrent saves serialize without corrupting the file', async () => {
+    const a = saveLocations([{ name: 'A', path: '/a' }]);
+    const b = saveLocations([{ name: 'B', path: '/b' }]);
+    await Promise.all([a, b]);
+    const onDisk = JSON.parse(fs.readFileSync(LOCATIONS_FILE, 'utf8'));
+    // Last-write-wins: the file ends up as exactly one of the two payloads,
+    // not a mix.
+    expect(onDisk.locations).toHaveLength(1);
+    const name = onDisk.locations[0].name;
+    expect(['A', 'B']).toContain(name);
   });
 });
 
