@@ -337,7 +337,7 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
         </div>
       )}
 
-      <div className="flex-1">
+      <div className="flex-1 flex flex-col min-h-0">
         <CompactTorrentList
           visibleTorrents={visibleTorrents}
           unfilteredCount={filteredTorrents.length}
