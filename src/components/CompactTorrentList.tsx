@@ -325,7 +325,7 @@ export function CompactTorrentList({
         isOpen={!!pendingMove}
         onClose={() => setPendingMove(null)}
         currentPath={pendingMove?.save_path ?? ''}
-        torrentName={pendingMove?.name ?? ''}
+        subject={pendingMove?.name ?? ''}
         onSubmit={(location) =>
           pendingMove ? onSetLocation([pendingMove.hash], location) : Promise.resolve()
         }

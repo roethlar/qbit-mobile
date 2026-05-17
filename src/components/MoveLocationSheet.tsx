@@ -7,16 +7,19 @@ import { useLocationPresets } from '../hooks/useLocationPresets';
 interface MoveLocationSheetProps {
   isOpen: boolean;
   onClose: () => void;
+  // Description of what's being moved: a single torrent name, or a
+  // count like "5 torrents" for bulk operations.
+  subject: string;
+  // Empty when bulk-moving torrents that may have different paths.
   currentPath: string;
-  torrentName: string;
   onSubmit: (location: string) => Promise<void>;
 }
 
 export function MoveLocationSheet({
   isOpen,
   onClose,
+  subject,
   currentPath,
-  torrentName,
   onSubmit,
 }: MoveLocationSheetProps) {
   const presets = useLocationPresets();
@@ -56,17 +59,19 @@ export function MoveLocationSheet({
     <BottomSheet isOpen={isOpen} onClose={onClose} title="Move torrent">
       <div className="p-4 space-y-4">
         <div>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Torrent</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Move</p>
           <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate selectable">
-            {torrentName}
+            {subject}
           </p>
         </div>
-        <div>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Currently</p>
-          <p className="text-sm text-gray-900 dark:text-gray-100 break-all selectable">
-            {currentPath || '—'}
-          </p>
-        </div>
+        {currentPath && (
+          <div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Currently</p>
+            <p className="text-sm text-gray-900 dark:text-gray-100 break-all selectable">
+              {currentPath}
+            </p>
+          </div>
+        )}
 
         {presets.data && presets.data.length > 0 && (
           <div>
@@ -109,6 +114,12 @@ export function MoveLocationSheet({
           <p className="text-xs text-gray-500 dark:text-gray-400">Loading presets…</p>
         )}
 
+        {presets.isError && (
+          <p className="text-xs text-red-600 dark:text-red-400">
+            Couldn't load preset list — type a path below to continue.
+          </p>
+        )}
+
         <div>
           <label
             htmlFor="custom-path"
@@ -128,7 +139,7 @@ export function MoveLocationSheet({
             className="w-full ios-input text-sm"
             disabled={submitting}
           />
-          {!presets.data?.length && !presets.isLoading && (
+          {!presets.data?.length && !presets.isLoading && !presets.isError && (
             <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
               No presets configured. Set <code className="font-mono">DOWNLOAD_LOCATIONS</code> in
               .env to populate this menu.

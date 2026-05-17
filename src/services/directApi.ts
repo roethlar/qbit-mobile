@@ -166,8 +166,12 @@ export async function reannounceTorrent(hash: string): Promise<void> {
 }
 
 export async function setTorrentLocation(hashes: string[], location: string): Promise<void> {
-  await api.post(
-    '/torrents/setLocation',
-    new URLSearchParams({ hashes: hashes.join('|'), location }),
+  // Same per-request hash cap as the bulk helpers above. Live UI only sends
+  // one hash today, but the future bulk-move path will exceed 200 quickly.
+  await chunked(hashes, BULK_CHUNK_SIZE, (chunk) =>
+    api.post(
+      '/torrents/setLocation',
+      new URLSearchParams({ hashes: chunk.join('|'), location }),
+    ),
   );
 }

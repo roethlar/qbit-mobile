@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
-import { Plus, Settings, RefreshCw, Moon, Sun, CheckSquare, Play, Pause, Trash2, X, WifiOff } from 'lucide-react';
+import { Plus, Settings, RefreshCw, Moon, Sun, CheckSquare, Play, Pause, Trash2, FolderInput, X, WifiOff } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { Layout, Header, FloatingActionButton } from '../components/Layout';
 import { CompactTorrentList } from '../components/CompactTorrentList';
 import { AddTorrent } from '../components/AddTorrent';
 import { TorrentDetail } from '../components/TorrentDetail';
+import { MoveLocationSheet } from '../components/MoveLocationSheet';
 import { useDirectTorrents, useDirectGlobalStats, useDirectTorrentActions } from '../hooks/useDirectTorrents';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { useTorrentFilters } from '../hooks/useTorrentFilters';
@@ -38,6 +39,7 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedHashes, setSelectedHashes] = useState<Set<string>>(() => new Set());
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  const [showBulkMove, setShowBulkMove] = useState(false);
   const successTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => () => {
@@ -177,6 +179,12 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
       { hashes: Array.from(selectedHashes), deleteFiles },
       { onSuccess: () => { setShowBulkDeleteConfirm(false); exitSelectMode(); } },
     );
+  };
+  const handleBulkMove = async (location: string) => {
+    if (selectedHashes.size === 0) return;
+    await setLocation.mutateAsync({ hashes: Array.from(selectedHashes), location });
+    setShowBulkMove(false);
+    exitSelectMode();
   };
 
   const selectAllVisible = () => {
@@ -365,7 +373,7 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
 
       {selectMode ? (
         <div
-          className="border-t border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 py-2 pb-safe grid grid-cols-3 gap-2"
+          className="border-t border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 py-2 pb-safe grid grid-cols-4 gap-2"
           role="toolbar"
           aria-label="Bulk actions"
         >
@@ -382,6 +390,13 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
             className="flex items-center justify-center gap-1.5 py-2 rounded-xl bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 active:bg-orange-100 dark:active:bg-orange-900/40 disabled:opacity-40 text-sm font-medium"
           >
             <Pause className="w-4 h-4" /> Pause
+          </button>
+          <button
+            onClick={() => setShowBulkMove(true)}
+            disabled={selectedHashes.size === 0 || bulkPending}
+            className="flex items-center justify-center gap-1.5 py-2 rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 active:bg-blue-100 dark:active:bg-blue-900/40 disabled:opacity-40 text-sm font-medium"
+          >
+            <FolderInput className="w-4 h-4" /> Move
           </button>
           <button
             onClick={() => setShowBulkDeleteConfirm(true)}
@@ -446,6 +461,14 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
         onClose={() => setShowAddTorrent(false)}
         onAddUrl={handleAddTorrentUrl}
         onAddFile={handleAddTorrentFile}
+      />
+
+      <MoveLocationSheet
+        isOpen={showBulkMove}
+        onClose={() => setShowBulkMove(false)}
+        subject={`${selectedHashes.size} torrent${selectedHashes.size === 1 ? '' : 's'}`}
+        currentPath=""
+        onSubmit={handleBulkMove}
       />
 
       {selectedTorrent && (

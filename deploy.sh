@@ -181,6 +181,10 @@ prompt_with_default() {
     local default="$2"
     local var=""
     read -r -p "$prompt [$default]: " var || true
+    # Same trim as the choice prompts: whitespace-only input shouldn't override
+    # the bracketed default. None of the prompts using this helper accept
+    # values containing whitespace anyway (ports, hostnames, usernames).
+    var="${var//[[:space:]]/}"
     if [ -z "$var" ]; then
         echo "$default"
     else
