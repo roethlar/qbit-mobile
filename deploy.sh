@@ -48,14 +48,18 @@ fi
 
 print_msg "Checking prerequisites..."
 
-if ! command -v node &> /dev/null; then
+NODE_BIN=$(command -v node || true)
+if [ -z "${NODE_BIN}" ]; then
     print_error "Node.js is not installed. Please install Node.js 18+ first."
     exit 1
 fi
+# Resolve symlinks so the systemd unit gets a stable absolute path even when
+# the operator uses nvm/asdf/snap/Volta where 'node' is a shim.
+NODE_BIN=$(readlink -f "${NODE_BIN}" 2>/dev/null || echo "${NODE_BIN}")
 
-NODE_VERSION=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
+NODE_VERSION=$("${NODE_BIN}" -v | cut -d'v' -f2 | cut -d'.' -f1)
 if [ "$NODE_VERSION" -lt 18 ]; then
-    print_error "Node.js version 18+ is required. Current version: $(node -v)"
+    print_error "Node.js version 18+ is required. Current version: $(${NODE_BIN} -v)"
     exit 1
 fi
 
@@ -152,8 +156,11 @@ while true; do
             ;;
         2)
             SERVICE_USER="nobody"
-            SERVICE_GROUP="nobody"
-            print_msg "Using nobody user (minimal permissions)"
+            # Distros disagree on `nobody`'s primary group: Debian/Ubuntu use
+            # nogroup, RHEL/Fedora/Arch use nobody. Detect at install time
+            # rather than guessing.
+            SERVICE_GROUP=$(id -gn nobody 2>/dev/null || echo nobody)
+            print_msg "Using nobody user (group: ${SERVICE_GROUP}, minimal permissions)"
             break
             ;;
         *)
@@ -430,7 +437,7 @@ User=${SERVICE_USER}
 Group=${SERVICE_GROUP}
 WorkingDirectory=${APP_DIR}
 Environment="NODE_ENV=production"
-ExecStart=/usr/bin/node ${APP_DIR}/server/server.js
+ExecStart=${NODE_BIN} ${APP_DIR}/server/server.js
 Restart=always
 RestartSec=10
 

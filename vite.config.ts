@@ -5,12 +5,20 @@ import { VitePWA } from 'vite-plugin-pwa'
 // NOTE: `npm run dev` proxies /api straight to qBittorrent and does NOT
 // route through the Express server. That means in dev there is no app-level
 // Basic auth, no endpoint allowlist, no setPreferences key filter, and no
-// qB4/qB5 path translation. To keep that surface from being reachable on
-// the LAN by accident, the dev server binds to 127.0.0.1 by default. Set
-// VITE_DEV_HOST=0.0.0.0 (and accept the security implications) to expose
-// it for phone-on-LAN development.
+// qB4/qB5 path translation. The dev server binds to 127.0.0.1 by default;
+// exposing it on the LAN requires VITE_DEV_HOST=0.0.0.0 AND an explicit
+// acknowledgement that you understand what's reachable through the proxy.
 const devHost = process.env.VITE_DEV_HOST || '127.0.0.1';
 const devIsLoopback = devHost === '127.0.0.1' || devHost === '::1' || devHost === 'localhost';
+
+if (!devIsLoopback && process.env.VITE_I_KNOW_THIS_IS_UNSAFE !== '1') {
+  throw new Error(
+    `\nRefusing to start: VITE_DEV_HOST="${devHost}" exposes the dev proxy on the LAN with no auth\n` +
+      'and no endpoint allowlist (it talks directly to qBittorrent, bypassing the Express server).\n' +
+      'If you understand the implications and need phone-on-LAN dev access, rerun with:\n' +
+      `  VITE_I_KNOW_THIS_IS_UNSAFE=1 VITE_DEV_HOST=${devHost} npm run dev\n`,
+  );
+}
 
 export default defineConfig({
   plugins: [
