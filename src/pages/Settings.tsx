@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Download, Upload, Folder, Pause, Wifi } from 'lucide-react';
 import { Layout, Header } from '../components/Layout';
+import { LocationPresetsCard } from '../components/LocationPresetsCard';
 import { getPreferences, setPreferences as apiSetPreferences } from '../services/directApi';
 import { formatSpeed } from '../utils/formatters';
 import type { Preferences } from '../types/qbittorrent';
@@ -242,6 +243,9 @@ export function Settings({ onBack }: SettingsProps) {
             />
           </div>
         </div>
+
+        {/* Move-to Presets (independent of qB save) */}
+        <LocationPresetsCard />
 
         {/* New Torrents */}
         <div className="bg-white dark:bg-gray-800 rounded-xl mx-4 p-4">

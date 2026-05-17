@@ -10,6 +10,7 @@ const axiosMock = vi.mocked(axios);
 
 const { app } = await import('../server.js');
 const { __resetCapabilitiesForTests } = await import('../qbClient.js');
+const { __resetForTests: __resetLocationsForTests } = await import('../locations.js');
 
 const CREDS = ['tester', 'testpw'];
 
@@ -19,6 +20,9 @@ beforeEach(() => {
   // qbClient holds module state (cap flags, session cookie). Without this
   // a prior test's confirmLegacyMode() leaks and changes path routing.
   __resetCapabilitiesForTests();
+  // locations.js caches loaded entries in-memory; reset so each test starts
+  // from the env seed or empty file.
+  __resetLocationsForTests();
 });
 
 describe('app auth', () => {
@@ -238,7 +242,7 @@ describe('setLocation', () => {
 });
 
 describe('location presets endpoint', () => {
-  it('returns an empty array when DOWNLOAD_LOCATIONS is unset', async () => {
+  it('returns an empty array when no persisted file and no env seed', async () => {
     const res = await request(app).get('/api/locations').auth(...CREDS);
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ locations: [] });
@@ -246,6 +250,85 @@ describe('location presets endpoint', () => {
 
   it('still requires auth', async () => {
     const res = await request(app).get('/api/locations');
+    expect(res.status).toBe(401);
+  });
+
+  it('PUT persists a list and subsequent GET returns it', async () => {
+    const payload = {
+      locations: [
+        { name: 'Movies', path: '/mnt/movies' },
+        { name: 'TV', path: '/mnt/tv' },
+      ],
+    };
+    const put = await request(app)
+      .put('/api/locations')
+      .auth(...CREDS)
+      .set('Content-Type', 'application/json')
+      .send(payload);
+    expect(put.status).toBe(200);
+    expect(put.body.locations).toEqual(payload.locations);
+
+    const get = await request(app).get('/api/locations').auth(...CREDS);
+    expect(get.status).toBe(200);
+    expect(get.body.locations).toEqual(payload.locations);
+  });
+
+  it('PUT trims whitespace and skips blank rows', async () => {
+    const res = await request(app)
+      .put('/api/locations')
+      .auth(...CREDS)
+      .set('Content-Type', 'application/json')
+      .send({
+        locations: [
+          { name: '  Movies  ', path: '  /mnt/movies  ' },
+          { name: '', path: '' },
+          { name: 'TV', path: '/mnt/tv' },
+        ],
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.locations).toEqual([
+      { name: 'Movies', path: '/mnt/movies' },
+      { name: 'TV', path: '/mnt/tv' },
+    ]);
+  });
+
+  it('PUT rejects half-populated entries', async () => {
+    const res = await request(app)
+      .put('/api/locations')
+      .auth(...CREDS)
+      .set('Content-Type', 'application/json')
+      .send({ locations: [{ name: 'NameOnly', path: '' }] });
+    expect(res.status).toBe(400);
+  });
+
+  it('PUT rejects duplicate names', async () => {
+    const res = await request(app)
+      .put('/api/locations')
+      .auth(...CREDS)
+      .set('Content-Type', 'application/json')
+      .send({
+        locations: [
+          { name: 'Movies', path: '/a' },
+          { name: 'Movies', path: '/b' },
+        ],
+      });
+    expect(res.status).toBe(400);
+  });
+
+  it('PUT rejects non-array body', async () => {
+    const res = await request(app)
+      .put('/api/locations')
+      .auth(...CREDS)
+      .set('Content-Type', 'application/json')
+      .send({ locations: 'nope' });
+    expect(res.status).toBe(400);
+  });
+
+  it('PUT requires auth', async () => {
+    const res = await request(app)
+      .put('/api/locations')
+      .set('Content-Type', 'application/json')
+      .send({ locations: [] });
     expect(res.status).toBe(401);
   });
 });

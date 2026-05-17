@@ -15,6 +15,11 @@ import {
   qbPort,
 } from './qbClient.js';
 import torrentsRouter from './routes/torrents.js';
+import {
+  loadLocations,
+  saveLocations,
+  LocationsValidationError,
+} from './locations.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -44,28 +49,9 @@ if (!VALID_AUTH_MODES.has(AUTH_MODE)) {
   process.exit(1);
 }
 
-// --- Download location presets -------------------------------------------
-// DOWNLOAD_LOCATIONS lets the operator pre-populate a list of move-to paths
-// so phone users don't have to type server filesystem paths. Format:
-//   DOWNLOAD_LOCATIONS="Movies=/mnt/movies|TV=/mnt/tv|Music=/mnt/music"
-// The "name|path" separator is `=`, entries separated by `|`. Empty or
-// malformed entries are silently dropped.
-const DOWNLOAD_LOCATIONS = parseLocationPresets(process.env.DOWNLOAD_LOCATIONS || '');
-
-function parseLocationPresets(raw) {
-  if (!raw) return [];
-  return raw
-    .split('|')
-    .map((entry) => {
-      const eq = entry.indexOf('=');
-      if (eq < 0) return null;
-      const name = entry.slice(0, eq).trim();
-      const value = entry.slice(eq + 1).trim();
-      if (!name || !value) return null;
-      return { name, path: value };
-    })
-    .filter(Boolean);
-}
+// Persistent location preset storage lives in server/locations.js. It backs
+// the GET/PUT /api/locations endpoints below, with the DOWNLOAD_LOCATIONS
+// env var acting as a first-boot seed when no persisted file exists yet.
 
 if (AUTH_MODE === 'basic' && (!APP_USERNAME || !APP_PASSWORD)) {
   console.error(
@@ -344,9 +330,28 @@ app.post('/api/v2/torrents/setLocation', (req, res) => {
 });
 
 // App-level config: preset move-to locations so phone users don't have to
-// type server filesystem paths. Operator-configured via DOWNLOAD_LOCATIONS.
-app.get('/api/locations', (req, res) => {
-  res.json({ locations: DOWNLOAD_LOCATIONS });
+// type server filesystem paths. Editable from the Settings UI; backed by
+// data/locations.json with DOWNLOAD_LOCATIONS as a first-boot seed.
+app.get('/api/locations', async (req, res) => {
+  try {
+    res.json({ locations: await loadLocations() });
+  } catch (err) {
+    console.error('[locations] load failed:', err.message);
+    res.status(500).json({ error: 'Failed to load locations' });
+  }
+});
+
+app.put('/api/locations', async (req, res) => {
+  try {
+    const cleaned = await saveLocations(req.body?.locations);
+    res.json({ locations: cleaned });
+  } catch (err) {
+    if (err instanceof LocationsValidationError) {
+      return res.status(400).json({ error: err.message });
+    }
+    console.error('[locations] save failed:', err.message);
+    res.status(500).json({ error: 'Failed to save locations' });
+  }
 });
 
 // Torrent upload (multipart) — handled by dedicated router.

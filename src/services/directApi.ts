@@ -32,6 +32,11 @@ export async function getLocationPresets(): Promise<LocationPreset[]> {
   return response.data?.locations ?? [];
 }
 
+export async function putLocationPresets(locations: LocationPreset[]): Promise<LocationPreset[]> {
+  const response = await appApi.put('/locations', { locations });
+  return response.data?.locations ?? [];
+}
+
 export async function getTorrents(): Promise<Torrent[]> {
   const response = await api.get('/torrents/info');
   return response.data || [];

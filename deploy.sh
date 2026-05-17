@@ -402,6 +402,11 @@ else
     fi
 fi
 
+# Create the runtime data dir (location presets persist here as JSON).
+# Service unit grants ReadWritePaths to just this directory; the rest of
+# the install stays read-only under ProtectSystem=strict.
+mkdir -p "${APP_DIR}/data"
+
 # Set permissions. .env is always 640 so the password isn't world-readable.
 print_msg "Setting permissions..."
 chown -R "${SERVICE_USER}:${SERVICE_GROUP}" "${APP_DIR}"
@@ -444,6 +449,7 @@ ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectKernelLogs=true
 ProtectControlGroups=true
+ReadWritePaths=${APP_DIR}/data
 RestrictAddressFamilies=AF_INET AF_INET6
 RestrictNamespaces=true
 RestrictRealtime=true

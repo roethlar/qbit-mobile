@@ -105,13 +105,17 @@ The proxy only forwards a curated set of qBittorrent endpoints — `/torrents/{i
 
 ### Move-to location presets
 
-The "Move" action in the row expansion lets you change a torrent's save path (and physically move the downloaded files). To pre-populate the picker with named targets, set `DOWNLOAD_LOCATIONS` in `.env`:
+The "Move" action in the row expansion lets you change a torrent's save path (and physically move the downloaded files). The same "Move" sits in the bulk-select toolbar for multi-torrent relocations.
+
+Presets are managed from the Settings page → "Move-to Presets" card: add a row, fill in Name and Path, hit Save. Changes persist to `data/locations.json` in the install directory.
+
+For a first-boot seed before anyone has touched the Settings page, set `DOWNLOAD_LOCATIONS` in `.env`:
 
 ```env
 DOWNLOAD_LOCATIONS=Movies=/mnt/media/movies|TV=/mnt/media/tv|Music=/mnt/media/music
 ```
 
-Entries are pipe-separated; each entry is `Name=/path`. Restart the service after editing. Users can always type a custom path too — presets are just shortcuts.
+Entries are pipe-separated; each is `Name=/path`. Once the operator saves the list through the UI, the env var is ignored on subsequent boots — the JSON file becomes the source of truth. Users can always type a custom path in the Move sheet too — presets are just shortcuts.
 
 ### qBittorrent Configuration
 
