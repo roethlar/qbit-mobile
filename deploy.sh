@@ -128,6 +128,9 @@ fi
 user_choice=""
 while true; do
     read -r -p "Choose service user [${DEFAULT_USER_CHOICE}]: " user_choice
+    # Strip whitespace so pasted newlines or accidental spaces still default
+    # the way [N] in the prompt implies.
+    user_choice="${user_choice//[[:space:]]/}"
     case ${user_choice:-${DEFAULT_USER_CHOICE}} in
         1)
             SERVICE_USER="qbitmobile"
@@ -165,6 +168,7 @@ confirm_overwrite_env() {
     local yn=""
     while true; do
         read -r -p "A .env already exists. Overwrite it? [y/N]: " yn
+        yn="${yn//[[:space:]]/}"
         case ${yn:-N} in
             [Yy]*) return 0 ;;
             [Nn]*) return 1 ;;
@@ -221,6 +225,7 @@ prompt_app_auth() {
     echo "2) Disabled (no auth — only safe on a fully trusted LAN)"
     while true; do
         read -r -p "Choose authentication method [1]: " app_auth_choice || true
+        app_auth_choice="${app_auth_choice//[[:space:]]/}"
         case ${app_auth_choice:-1} in
             1)
                 AUTH_MODE="basic"
@@ -350,6 +355,7 @@ if [ "$overwrite_env" = true ]; then
     auth_choice=""
     while true; do
         read -r -p "Choose authentication method [1]: " auth_choice || true
+        auth_choice="${auth_choice//[[:space:]]/}"
         case ${auth_choice:-1} in
             1)
                 QB_USER=""
