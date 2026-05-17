@@ -49,7 +49,7 @@ export default [
     },
   },
   {
-    files: ['vitest.config.ts', 'test/setup.ts'],
+    files: ['vitest.config.ts', 'vitest.workspace.ts', 'test/setup.ts', 'test/setup.ui.ts'],
     languageOptions: {
       globals: { ...globals.node },
     },
