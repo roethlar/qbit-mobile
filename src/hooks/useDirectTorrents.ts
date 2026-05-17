@@ -162,6 +162,14 @@ export function useDirectTorrentActions() {
     },
   });
 
+  const setLocation = useMutation({
+    mutationFn: ({ hashes, location }: { hashes: string[]; location: string }) =>
+      api.setTorrentLocation(hashes, location),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: TORRENTS_KEY });
+    },
+  });
+
   const addTorrentUrl = useMutation({
     mutationFn: ({ url, options }: { url: string; options?: api.AddTorrentOptions }) =>
       api.addTorrentUrl(url, options),
@@ -185,6 +193,7 @@ export function useDirectTorrentActions() {
     pauseTorrents,
     resumeTorrents,
     deleteTorrents,
+    setLocation,
     addTorrentUrl,
     addTorrentFile,
   };

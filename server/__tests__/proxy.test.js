@@ -59,7 +59,6 @@ describe('app auth', () => {
 describe('endpoint allowlist', () => {
   const blocked = [
     ['post', '/api/v2/app/shutdown'],
-    ['post', '/api/v2/torrents/setLocation'],
     ['post', '/api/v2/torrents/createCategory'],
     ['post', '/api/v2/torrents/setShareLimits'],
     ['get', '/api/v2/log/main'],
@@ -194,6 +193,60 @@ describe('per-torrent detail endpoints', () => {
     const call = axiosMock.mock.calls[axiosMock.mock.calls.length - 1][0];
     expect(call.url).not.toContain('extra');
     expect(call.url).not.toContain('another');
+  });
+});
+
+describe('setLocation', () => {
+  const VALID_HASH = 'f'.repeat(40);
+
+  it('forwards POST /torrents/setLocation with valid hash + location', async () => {
+    const res = await request(app)
+      .post('/api/v2/torrents/setLocation')
+      .auth(...CREDS)
+      .send(`hashes=${VALID_HASH}&location=${encodeURIComponent('/mnt/movies')}`);
+    expect(res.status).toBe(200);
+    const call = axiosMock.mock.calls[axiosMock.mock.calls.length - 1][0];
+    expect(call.url).toContain('/torrents/setLocation');
+    expect(call.data).toContain(`hashes=${VALID_HASH}`);
+    expect(call.data).toContain('location=');
+  });
+
+  it('rejects missing location', async () => {
+    const res = await request(app)
+      .post('/api/v2/torrents/setLocation')
+      .auth(...CREDS)
+      .send(`hashes=${VALID_HASH}`);
+    expect(res.status).toBe(400);
+    expect(axiosMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects empty location', async () => {
+    const res = await request(app)
+      .post('/api/v2/torrents/setLocation')
+      .auth(...CREDS)
+      .send(`hashes=${VALID_HASH}&location=`);
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects hashes=all (destructive at scale)', async () => {
+    const res = await request(app)
+      .post('/api/v2/torrents/setLocation')
+      .auth(...CREDS)
+      .send('hashes=all&location=/tmp');
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('location presets endpoint', () => {
+  it('returns an empty array when DOWNLOAD_LOCATIONS is unset', async () => {
+    const res = await request(app).get('/api/locations').auth(...CREDS);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ locations: [] });
+  });
+
+  it('still requires auth', async () => {
+    const res = await request(app).get('/api/locations');
+    expect(res.status).toBe(401);
   });
 });
 

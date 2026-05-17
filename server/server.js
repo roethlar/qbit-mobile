@@ -44,6 +44,29 @@ if (!VALID_AUTH_MODES.has(AUTH_MODE)) {
   process.exit(1);
 }
 
+// --- Download location presets -------------------------------------------
+// DOWNLOAD_LOCATIONS lets the operator pre-populate a list of move-to paths
+// so phone users don't have to type server filesystem paths. Format:
+//   DOWNLOAD_LOCATIONS="Movies=/mnt/movies|TV=/mnt/tv|Music=/mnt/music"
+// The "name|path" separator is `=`, entries separated by `|`. Empty or
+// malformed entries are silently dropped.
+const DOWNLOAD_LOCATIONS = parseLocationPresets(process.env.DOWNLOAD_LOCATIONS || '');
+
+function parseLocationPresets(raw) {
+  if (!raw) return [];
+  return raw
+    .split('|')
+    .map((entry) => {
+      const eq = entry.indexOf('=');
+      if (eq < 0) return null;
+      const name = entry.slice(0, eq).trim();
+      const value = entry.slice(eq + 1).trim();
+      if (!name || !value) return null;
+      return { name, path: value };
+    })
+    .filter(Boolean);
+}
+
 if (AUTH_MODE === 'basic' && (!APP_USERNAME || !APP_PASSWORD)) {
   console.error(
     '[fatal] AUTH_MODE=basic but APP_USERNAME or APP_PASSWORD is empty. ' +
@@ -306,6 +329,24 @@ app.post('/api/v2/torrents/recheck', (req, res) => {
 app.post('/api/v2/torrents/reannounce', (req, res) => {
   if (!validateHashes(req, res, { allowAll: false })) return;
   proxyFormPost(req, res, '/torrents/reannounce');
+});
+
+// Move the torrent's save location (and the already-downloaded files).
+// Requires a non-empty location string. hashes=all is refused so a buggy
+// caller can't relocate every torrent in one shot.
+app.post('/api/v2/torrents/setLocation', (req, res) => {
+  if (!validateHashes(req, res, { allowAll: false })) return;
+  const location = req.body && req.body.location;
+  if (typeof location !== 'string' || location.trim() === '') {
+    return res.status(400).json({ error: 'Missing or empty "location"' });
+  }
+  proxyFormPost(req, res, '/torrents/setLocation');
+});
+
+// App-level config: preset move-to locations so phone users don't have to
+// type server filesystem paths. Operator-configured via DOWNLOAD_LOCATIONS.
+app.get('/api/locations', (req, res) => {
+  res.json({ locations: DOWNLOAD_LOCATIONS });
 });
 
 // Torrent upload (multipart) — handled by dedicated router.

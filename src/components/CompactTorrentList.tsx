@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, memo } from 'react';
 import {
-  Play, Pause, Trash2, RefreshCw, Radio,
+  Play, Pause, Trash2, RefreshCw, Radio, FolderInput,
   Search, X, ArrowUpDown, ArrowUp, ArrowDown, Tag, Check, ChevronDown, ChevronRight,
 } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -13,6 +13,7 @@ import {
 import { BottomSheet } from './Layout';
 import type { SortField, SortOrder } from '../hooks/useTorrentFilters';
 import { useTorrentDetailActions } from '../hooks/useTorrentDetail';
+import { MoveLocationSheet } from './MoveLocationSheet';
 import { clsx } from 'clsx';
 
 const isPausedState = (state: TorrentState) => PAUSED_STATES_SET.has(state);
@@ -26,6 +27,7 @@ interface CompactTorrentListProps {
   onPause: (hash: string) => void;
   onResume: (hash: string) => void;
   onDelete: (hash: string, deleteFiles?: boolean) => void;
+  onSetLocation: (hashes: string[], location: string) => Promise<void>;
   onTorrentClick?: (torrent: Torrent) => void;
   selectMode?: boolean;
   selectedHashes?: ReadonlySet<string>;
@@ -48,6 +50,7 @@ export function CompactTorrentList({
   onPause,
   onResume,
   onDelete,
+  onSetLocation,
   onTorrentClick,
   selectMode = false,
   selectedHashes,
@@ -63,6 +66,7 @@ export function CompactTorrentList({
 }: CompactTorrentListProps) {
   const [expandedHash, setExpandedHash] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Torrent | null>(null);
+  const [pendingMove, setPendingMove] = useState<Torrent | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   const [showTags, setShowTags] = useState(false);
   const [showSortOptions, setShowSortOptions] = useState(false);
@@ -89,7 +93,7 @@ export function CompactTorrentList({
   }, [selectMode, onToggleSelect]);
 
   const handleRowAction = useCallback(
-    (torrent: Torrent, action: 'toggle' | 'recheck' | 'reannounce' | 'delete' | 'detail') => {
+    (torrent: Torrent, action: 'toggle' | 'recheck' | 'reannounce' | 'delete' | 'move' | 'detail') => {
       switch (action) {
         case 'toggle':
           if (isPausedState(torrent.state)) onResume(torrent.hash);
@@ -103,6 +107,9 @@ export function CompactTorrentList({
           break;
         case 'delete':
           setPendingDelete(torrent);
+          break;
+        case 'move':
+          setPendingMove(torrent);
           break;
         case 'detail':
           onTorrentClick?.(torrent);
@@ -314,6 +321,16 @@ export function CompactTorrentList({
         </div>
       </div>
 
+      <MoveLocationSheet
+        isOpen={!!pendingMove}
+        onClose={() => setPendingMove(null)}
+        currentPath={pendingMove?.save_path ?? ''}
+        torrentName={pendingMove?.name ?? ''}
+        onSubmit={(location) =>
+          pendingMove ? onSetLocation([pendingMove.hash], location) : Promise.resolve()
+        }
+      />
+
       <BottomSheet
         isOpen={!!pendingDelete}
         onClose={() => setPendingDelete(null)}
@@ -352,7 +369,7 @@ export function CompactTorrentList({
   );
 }
 
-type RowAction = 'toggle' | 'recheck' | 'reannounce' | 'delete' | 'detail';
+type RowAction = 'toggle' | 'recheck' | 'reannounce' | 'delete' | 'move' | 'detail';
 
 interface CompactTorrentRowProps {
   torrent: Torrent;
@@ -507,7 +524,7 @@ function ExpandedDetail({ torrent, isPaused, onAction, recheckPending, reannounc
         </div>
       </dl>
 
-      <div className="grid grid-cols-4 gap-1 pt-1">
+      <div className="grid grid-cols-3 gap-1 pt-1">
         <ActionButton
           label={isPaused ? 'Resume' : 'Pause'}
           icon={isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
@@ -527,20 +544,22 @@ function ExpandedDetail({ torrent, isPaused, onAction, recheckPending, reannounc
           disabled={reannouncePending}
         />
         <ActionButton
+          label="Move"
+          icon={<FolderInput className="w-4 h-4" />}
+          onClick={() => onAction(torrent, 'move')}
+        />
+        <ActionButton
           label="Delete"
           icon={<Trash2 className="w-4 h-4" />}
           tone="danger"
           onClick={() => onAction(torrent, 'delete')}
         />
+        <ActionButton
+          label="Details"
+          icon={<ChevronRight className="w-4 h-4" />}
+          onClick={() => onAction(torrent, 'detail')}
+        />
       </div>
-
-      <button
-        onClick={() => onAction(torrent, 'detail')}
-        className="w-full flex items-center justify-center gap-1 py-1.5 text-[11px] text-primary-600 dark:text-primary-400 active:bg-gray-100 dark:active:bg-gray-700 rounded"
-      >
-        View files &amp; trackers
-        <ChevronRight className="w-3 h-3" />
-      </button>
     </div>
   );
 }

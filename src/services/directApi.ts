@@ -14,6 +14,24 @@ const api = axios.create({
   withCredentials: false,
 });
 
+// App-level config endpoints live at /api/... (not under /api/v2). Same auth
+// middleware applies; this just keeps qB's namespace clean.
+const appApi = axios.create({
+  baseURL: '/api',
+  timeout: 30000,
+  withCredentials: false,
+});
+
+export interface LocationPreset {
+  name: string;
+  path: string;
+}
+
+export async function getLocationPresets(): Promise<LocationPreset[]> {
+  const response = await appApi.get('/locations');
+  return response.data?.locations ?? [];
+}
+
 export async function getTorrents(): Promise<Torrent[]> {
   const response = await api.get('/torrents/info');
   return response.data || [];
@@ -145,4 +163,11 @@ export async function recheckTorrent(hash: string): Promise<void> {
 
 export async function reannounceTorrent(hash: string): Promise<void> {
   await api.post('/torrents/reannounce', new URLSearchParams({ hashes: hash }));
+}
+
+export async function setTorrentLocation(hashes: string[], location: string): Promise<void> {
+  await api.post(
+    '/torrents/setLocation',
+    new URLSearchParams({ hashes: hashes.join('|'), location }),
+  );
 }

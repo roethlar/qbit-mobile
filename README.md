@@ -101,7 +101,17 @@ This app is designed to be reached from a phone on your LAN, so binding to `0.0.
 
 `AUTH_MODE=disabled` is available for trusted-LAN setups where you've already gated access at the network or reverse-proxy layer. The server prints a loud warning at boot if it's disabled while bound to a non-loopback interface.
 
-The proxy only forwards a curated set of qBittorrent endpoints — `/torrents/info`, `/transfer/info`, `/app/preferences`, `/app/version`, `/app/webapiVersion`, `/torrents/{stop,start,delete,add}`, and `/app/setPreferences` (with a key allowlist). Dangerous endpoints like `/app/shutdown`, `/torrents/setLocation`, and `autorun_program` preferences are not reachable through the proxy even when authenticated.
+The proxy only forwards a curated set of qBittorrent endpoints — `/torrents/{info,properties,files,trackers}`, `/transfer/info`, `/app/{preferences,version,webapiVersion}`, `/torrents/{stop,start,delete,add,recheck,reannounce,setLocation}`, and `/app/setPreferences` (with a key allowlist). Dangerous endpoints like `/app/shutdown` and RCE-enabling preference keys like `autorun_program` are not reachable through the proxy even when authenticated.
+
+### Move-to location presets
+
+The "Move" action in the row expansion lets you change a torrent's save path (and physically move the downloaded files). To pre-populate the picker with named targets, set `DOWNLOAD_LOCATIONS` in `.env`:
+
+```env
+DOWNLOAD_LOCATIONS=Movies=/mnt/media/movies|TV=/mnt/media/tv|Music=/mnt/media/music
+```
+
+Entries are pipe-separated; each entry is `Name=/path`. Restart the service after editing. Users can always type a custom path too — presets are just shortcuts.
 
 ### qBittorrent Configuration
 

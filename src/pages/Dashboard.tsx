@@ -61,6 +61,7 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
     pauseTorrents,
     resumeTorrents,
     deleteTorrents,
+    setLocation,
     addTorrentUrl,
     addTorrentFile,
   } = useDirectTorrentActions();
@@ -344,6 +345,9 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
           onPause={(hash) => pauseTorrent.mutate(hash)}
           onResume={(hash) => resumeTorrent.mutate(hash)}
           onDelete={(hash, deleteFiles) => deleteTorrent.mutate({ hash, deleteFiles })}
+          onSetLocation={(hashes, location) =>
+            setLocation.mutateAsync({ hashes, location }).then(() => undefined)
+          }
           onTorrentClick={(t) => setSelectedHash(t.hash)}
           selectMode={selectMode}
           selectedHashes={selectedHashes}
