@@ -15,6 +15,7 @@ import {
 } from '../utils/formatters';
 import { useTorrentDetail, useTorrentDetailActions } from '../hooks/useTorrentDetail';
 import { MoveLocationSheet } from './MoveLocationSheet';
+import { ConfirmDeleteSheet } from './ConfirmDeleteSheet';
 
 interface TorrentDetailProps {
   torrent: Torrent;
@@ -204,42 +205,12 @@ export function TorrentDetail({ torrent, onClose, onPause, onResume, onDelete, o
         onSubmit={(location) => onSetLocation(torrent.hash, location)}
       />
 
-      {showDeleteConfirm && (
-        <div
-          className="absolute inset-0 z-20 bg-black/40 flex items-end"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Confirm delete"
-          onClick={(e) => { if (e.target === e.currentTarget) setShowDeleteConfirm(false); }}
-        >
-          <div className="w-full bg-white dark:bg-gray-850 rounded-t-3xl p-4 pb-safe space-y-3">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Delete torrent</h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Are you sure you want to delete "{torrent.name}"?
-            </p>
-            <div className="space-y-2">
-              <button
-                onClick={() => handleDelete(false)}
-                className="w-full ios-button-secondary"
-              >
-                Delete torrent only
-              </button>
-              <button
-                onClick={() => handleDelete(true)}
-                className="w-full bg-red-600 text-white rounded-xl py-3 px-6 font-medium active:bg-red-700"
-              >
-                Delete torrent and files
-              </button>
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                className="w-full ios-button-secondary"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDeleteSheet
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        subject={torrent.name}
+        onConfirm={(deleteFiles) => handleDelete(deleteFiles)}
+      />
     </div>
   );
 }

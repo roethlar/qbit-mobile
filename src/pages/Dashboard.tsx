@@ -7,6 +7,7 @@ import { CompactTorrentList } from '../components/CompactTorrentList';
 import { AddTorrent } from '../components/AddTorrent';
 import { TorrentDetail } from '../components/TorrentDetail';
 import { MoveLocationSheet } from '../components/MoveLocationSheet';
+import { ConfirmDeleteSheet } from '../components/ConfirmDeleteSheet';
 import { useDirectTorrents, useDirectGlobalStats, useDirectTorrentActions } from '../hooks/useDirectTorrents';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { useTorrentFilters } from '../hooks/useTorrentFilters';
@@ -414,47 +415,13 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
         />
       )}
 
-      {showBulkDeleteConfirm && (
-        <div
-          className="fixed inset-0 z-50 bg-black/40 flex items-end"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Confirm bulk delete"
-          onClick={(e) => { if (e.target === e.currentTarget) setShowBulkDeleteConfirm(false); }}
-        >
-          <div className="w-full bg-white dark:bg-gray-850 rounded-t-3xl p-4 pb-safe space-y-3">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              Delete {selectedHashes.size} torrent{selectedHashes.size === 1 ? '' : 's'}?
-            </h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              This cannot be undone.
-            </p>
-            <div className="space-y-2">
-              <button
-                onClick={() => handleBulkDelete(false)}
-                disabled={bulkPending}
-                className="w-full ios-button-secondary disabled:opacity-50"
-              >
-                Delete torrents only
-              </button>
-              <button
-                onClick={() => handleBulkDelete(true)}
-                disabled={bulkPending}
-                className="w-full bg-red-600 text-white rounded-xl py-3 px-6 font-medium active:bg-red-700 disabled:opacity-50"
-              >
-                Delete torrents and files
-              </button>
-              <button
-                onClick={() => setShowBulkDeleteConfirm(false)}
-                disabled={bulkPending}
-                className="w-full ios-button-secondary disabled:opacity-50"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDeleteSheet
+        isOpen={showBulkDeleteConfirm}
+        onClose={() => setShowBulkDeleteConfirm(false)}
+        subject={`${selectedHashes.size} torrent${selectedHashes.size === 1 ? '' : 's'}`}
+        count={selectedHashes.size}
+        onConfirm={(deleteFiles) => handleBulkDelete(deleteFiles)}
+      />
 
       <AddTorrent
         isOpen={showAddTorrent}
