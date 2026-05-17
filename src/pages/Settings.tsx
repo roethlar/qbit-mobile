@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Download, Upload, Folder, Pause, Wifi } from 'lucide-react';
-import { Layout, Header } from '../components/Layout';
+import { BottomSheet, Layout, Header } from '../components/Layout';
 import { LocationPresetsCard } from '../components/LocationPresetsCard';
 import { getPreferences, setPreferences as apiSetPreferences } from '../services/directApi';
 import { formatSpeed } from '../utils/formatters';
@@ -32,6 +32,7 @@ export function Settings({ onBack }: SettingsProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const saveMessageTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
@@ -78,6 +79,16 @@ export function Settings({ onBack }: SettingsProps) {
 
   const isDirty = Object.keys(buildChangeSet()).length > 0;
 
+  // Intercept back navigation when there are unsaved qB pref changes. The
+  // presets card manages its own draft and warns independently.
+  const handleBack = () => {
+    if (isDirty) {
+      setShowDiscardConfirm(true);
+      return;
+    }
+    onBack();
+  };
+
   const handleSave = async () => {
     const changes = buildChangeSet();
     if (Object.keys(changes).length === 0) return;
@@ -108,7 +119,7 @@ export function Settings({ onBack }: SettingsProps) {
         <Header
           title="Settings"
           leftButton={
-            <button onClick={onBack} className="p-1 text-gray-600 hover:text-gray-900">
+            <button onClick={handleBack} className="p-1 text-gray-600 hover:text-gray-900">
               <ArrowLeft className="w-5 h-5" />
             </button>
           }
@@ -129,7 +140,7 @@ export function Settings({ onBack }: SettingsProps) {
         <Header
           title="Settings"
           leftButton={
-            <button onClick={onBack} className="p-1 text-gray-600 hover:text-gray-900">
+            <button onClick={handleBack} className="p-1 text-gray-600 hover:text-gray-900">
               <ArrowLeft className="w-5 h-5" />
             </button>
           }
@@ -350,6 +361,35 @@ export function Settings({ onBack }: SettingsProps) {
         <div className="h-20" />
       </div>
       </div>
+
+      <BottomSheet
+        isOpen={showDiscardConfirm}
+        onClose={() => setShowDiscardConfirm(false)}
+        title="Discard unsaved settings?"
+      >
+        <div className="p-4 space-y-3">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            You have unsaved changes. Leaving now will discard them.
+          </p>
+          <div className="space-y-2">
+            <button
+              onClick={() => {
+                setShowDiscardConfirm(false);
+                onBack();
+              }}
+              className="w-full bg-red-600 text-white rounded-xl py-3 px-6 font-medium active:bg-red-700 transition-colors"
+            >
+              Discard
+            </button>
+            <button
+              onClick={() => setShowDiscardConfirm(false)}
+              className="w-full ios-button-secondary"
+            >
+              Keep editing
+            </button>
+          </div>
+        </div>
+      </BottomSheet>
     </Layout>
   );
 }

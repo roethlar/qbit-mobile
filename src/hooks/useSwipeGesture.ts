@@ -43,15 +43,50 @@ export function useSwipeGesture({ enabled, onMove, onDelete }: UseSwipeGestureOp
   const [swipeDx, setSwipeDx] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const startRef = useRef<SwipeStart | null>(null);
+  // Mirror of swipeDx for touchend — state setter is async, the value captured
+  // in the touchend closure can be stale after the last move re-renders.
+  const swipeDxRef = useRef(0);
   const justSwipedRef = useRef(false);
+  // Backstop timer for clearing justSwipedRef. Mobile Safari may classify a
+  // fast drag as a drag (no synthetic click), in which case the guard would
+  // otherwise stay armed and swallow the next real tap.
+  const justSwipedClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const updateSwipeDx = (dx: number) => {
+    swipeDxRef.current = dx;
+    setSwipeDx(dx);
+  };
+
+  const resetGesture = () => {
+    startRef.current = null;
+    setIsDragging(false);
+    updateSwipeDx(0);
+  };
 
   const onTouchStart = (e: React.TouchEvent) => {
     if (!enabled) return;
+    // Multi-finger (pinch/zoom) is never a swipe. Bail before we capture the
+    // start point so a follow-up move doesn't commit.
+    if (e.touches.length !== 1) {
+      resetGesture();
+      return;
+    }
+    // Clear any stale guard so a tap immediately after a swipe-classified-as-
+    // drag (no synthetic click ever fired) still registers.
+    justSwipedRef.current = false;
+    if (justSwipedClearRef.current) {
+      clearTimeout(justSwipedClearRef.current);
+      justSwipedClearRef.current = null;
+    }
     const t = e.touches[0];
     startRef.current = { x: t.clientX, y: t.clientY, locked: null };
   };
 
   const onTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length !== 1) {
+      resetGesture();
+      return;
+    }
     const start = startRef.current;
     if (!start) return;
     const t = e.touches[0];
@@ -71,12 +106,12 @@ export function useSwipeGesture({ enabled, onMove, onDelete }: UseSwipeGestureOp
       }
     }
     if (start.locked === 'h') {
-      setSwipeDx(Math.max(-SWIPE_MAX_PX, Math.min(SWIPE_MAX_PX, dx)));
+      updateSwipeDx(Math.max(-SWIPE_MAX_PX, Math.min(SWIPE_MAX_PX, dx)));
     }
   };
 
   const onTouchEnd = () => {
-    const dx = swipeDx;
+    const dx = swipeDxRef.current;
     startRef.current = null;
     setIsDragging(false);
     if (dx <= -SWIPE_COMMIT_PX) {
@@ -86,16 +121,21 @@ export function useSwipeGesture({ enabled, onMove, onDelete }: UseSwipeGestureOp
       onMove();
       justSwipedRef.current = true;
     }
-    setSwipeDx(0);
+    updateSwipeDx(0);
+    if (justSwipedRef.current) {
+      if (justSwipedClearRef.current) clearTimeout(justSwipedClearRef.current);
+      justSwipedClearRef.current = setTimeout(() => {
+        justSwipedRef.current = false;
+        justSwipedClearRef.current = null;
+      }, 300);
+    }
   };
 
   // Browser-initiated cancellation (system gesture, alert popup, etc.) is not
   // a "user committed the swipe" signal — just snap back without firing the
   // action even if dx had crossed the threshold.
   const onTouchCancel = () => {
-    startRef.current = null;
-    setIsDragging(false);
-    setSwipeDx(0);
+    resetGesture();
   };
 
   const guardClick = <T extends (...args: never[]) => void>(handler: T): T => {

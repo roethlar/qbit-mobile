@@ -138,17 +138,18 @@ export function useDirectTorrentActions() {
 
   // Bulk variants. We skip optimistic patching here: a 50-row diff is harder
   // to roll back cleanly, and the user already sees the action button spinner
-  // until the next 5s poll arrives.
+  // until the next 5s poll arrives. Use onSettled so a partial-chunk failure
+  // still reconciles the cache against the real server state.
   const pauseTorrents = useMutation({
     mutationFn: (hashes: string[]) => api.pauseTorrents(hashes),
-    onSuccess: () => {
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: TORRENTS_KEY });
     },
   });
 
   const resumeTorrents = useMutation({
     mutationFn: (hashes: string[]) => api.resumeTorrents(hashes),
-    onSuccess: () => {
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: TORRENTS_KEY });
     },
   });
@@ -156,7 +157,7 @@ export function useDirectTorrentActions() {
   const deleteTorrents = useMutation({
     mutationFn: ({ hashes, deleteFiles }: { hashes: string[]; deleteFiles?: boolean }) =>
       api.deleteTorrents(hashes, deleteFiles),
-    onSuccess: () => {
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: TORRENTS_KEY });
       queryClient.invalidateQueries({ queryKey: GLOBAL_STATS_KEY });
     },
@@ -165,7 +166,7 @@ export function useDirectTorrentActions() {
   const setLocation = useMutation({
     mutationFn: ({ hashes, location }: { hashes: string[]; location: string }) =>
       api.setTorrentLocation(hashes, location),
-    onSuccess: () => {
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: TORRENTS_KEY });
     },
   });
@@ -175,6 +176,7 @@ export function useDirectTorrentActions() {
       api.addTorrentUrl(url, options),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: TORRENTS_KEY });
+      queryClient.invalidateQueries({ queryKey: GLOBAL_STATS_KEY });
     },
   });
 
@@ -183,6 +185,7 @@ export function useDirectTorrentActions() {
       api.addTorrentFile(file, options),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: TORRENTS_KEY });
+      queryClient.invalidateQueries({ queryKey: GLOBAL_STATS_KEY });
     },
   });
 

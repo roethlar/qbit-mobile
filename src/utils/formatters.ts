@@ -61,98 +61,73 @@ export function formatDate(timestamp: number): string {
   }
 }
 
-export function getStateColor(state: string): string {
-  switch (state) {
-    case 'downloading':
-    case 'metaDL':
-    case 'forcedDL':
-      return 'text-blue-600';
-    case 'uploading':
-    case 'forcedUP':
-      return 'text-green-600';
-    case 'pausedDL':
-    case 'pausedUP':
-    case 'stoppedDL':
-    case 'stoppedUP':
-      return 'text-gray-500';
-    case 'error':
-    case 'missingFiles':
-      return 'text-red-600';
-    case 'queuedDL':
-    case 'queuedUP':
-      return 'text-yellow-600';
-    case 'stalledDL':
-    case 'stalledUP':
-      return 'text-orange-600';
-    case 'checkingDL':
-    case 'checkingUP':
-    case 'checkingResumeData':
-      return 'text-purple-600';
-    case 'allocating':
-      return 'text-indigo-600';
-    default:
-      return 'text-gray-600';
-  }
+import type { TorrentState } from '../types/qbittorrent';
+
+// Single source of truth for per-state display + sort ordering. Keeping glyph,
+// color, and priority in one record prevents the three tables from drifting
+// when a new state is added.
+interface StateMeta {
+  glyph: string;
+  color: string;
+  priority: number;
 }
 
-export const STATE_PRIORITY: Record<string, number> = {
-  downloading: 1,
-  forcedDL: 1,
-  metaDL: 1,
-  forcedMetaDL: 1,
-  uploading: 2,
-  forcedUP: 2,
-  queuedDL: 3,
-  queuedUP: 3,
-  stalledDL: 4,
-  stalledUP: 4,
-  checkingDL: 5,
-  checkingUP: 5,
-  checkingResumeData: 5,
-  pausedDL: 6,
-  pausedUP: 6,
-  stoppedDL: 6,
-  stoppedUP: 6,
-  error: 7,
-  missingFiles: 7,
+const DEFAULT_META: StateMeta = { glyph: '●', color: 'text-gray-600', priority: 99 };
+
+export const STATE_META: Record<TorrentState, StateMeta> = {
+  downloading: { glyph: '↓', color: 'text-blue-600', priority: 1 },
+  forcedDL: { glyph: '⬇️', color: 'text-blue-600', priority: 1 },
+  metaDL: { glyph: '📥', color: 'text-blue-600', priority: 1 },
+  forcedMetaDL: { glyph: '📥', color: 'text-blue-600', priority: 1 },
+  uploading: { glyph: '↑', color: 'text-green-600', priority: 2 },
+  forcedUP: { glyph: '⬆️', color: 'text-green-600', priority: 2 },
+  queuedDL: { glyph: '⏳', color: 'text-yellow-600', priority: 3 },
+  queuedUP: { glyph: '⏳', color: 'text-yellow-600', priority: 3 },
+  stalledDL: { glyph: '⚠', color: 'text-orange-600', priority: 4 },
+  stalledUP: { glyph: '⚠', color: 'text-orange-600', priority: 4 },
+  // moving and checking are both I/O-bound transitional states; group them.
+  checkingDL: { glyph: '🔍', color: 'text-purple-600', priority: 5 },
+  checkingUP: { glyph: '🔍', color: 'text-purple-600', priority: 5 },
+  checkingResumeData: { glyph: '🔍', color: 'text-purple-600', priority: 5 },
+  moving: { glyph: '↔', color: 'text-gray-600', priority: 5 },
+  pausedDL: { glyph: '⏸', color: 'text-gray-500', priority: 6 },
+  pausedUP: { glyph: '⏸', color: 'text-gray-500', priority: 6 },
+  stoppedDL: { glyph: '⏸', color: 'text-gray-500', priority: 6 },
+  stoppedUP: { glyph: '⏸', color: 'text-gray-500', priority: 6 },
+  error: { glyph: '❌', color: 'text-red-600', priority: 7 },
+  missingFiles: { glyph: '❓', color: 'text-red-600', priority: 7 },
+  allocating: { glyph: '💾', color: 'text-indigo-600', priority: 5 },
+  unknown: DEFAULT_META,
 };
 
-export function getStateText(state: string): string {
-  switch (state) {
-    case 'downloading':
-      return '↓';
-    case 'uploading':
-      return '↑';
-    case 'pausedDL':
-    case 'pausedUP':
-    case 'stoppedDL':
-    case 'stoppedUP':
-      return '⏸';
-    case 'queuedDL':
-    case 'queuedUP':
-      return '⏳';
-    case 'stalledDL':
-    case 'stalledUP':
-      return '⚠';
-    case 'moving':
-      return '↔';
-    case 'checkingDL':
-    case 'checkingUP':
-    case 'checkingResumeData':
-      return '🔍';
-    case 'error':
-      return '❌';
-    case 'missingFiles':
-      return '❓';
-    case 'allocating':
-      return '💾';
-    case 'metaDL':
-      return '📥';
-    case 'forcedDL':
-      return '⬇️';
-    case 'forcedUP':
-      return '⬆️';
-    default:
-      return '●';
-  }
+function metaFor(state: string): StateMeta {
+  return STATE_META[state as TorrentState] ?? DEFAULT_META;
 }
+
+export function getStateColor(state: string): string {
+  return metaFor(state).color;
+}
+
+export function getStateText(state: string): string {
+  return metaFor(state).glyph;
+}
+
+export function getStatePriority(state: string): number {
+  return metaFor(state).priority;
+}
+
+// Back-compat proxy for existing call sites (and the test suite) that read
+// STATE_PRIORITY[state]. Reads return the priority from STATE_META; unknown
+// states fall through to the default 99.
+export const STATE_PRIORITY: Record<string, number> = new Proxy(
+  {} as Record<string, number>,
+  {
+    get(_target, prop) {
+      if (typeof prop !== 'string') return undefined;
+      return metaFor(prop).priority;
+    },
+    has(_target, prop) {
+      return typeof prop === 'string' && prop in STATE_META;
+    },
+  },
+);

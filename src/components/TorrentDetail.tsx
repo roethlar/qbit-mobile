@@ -16,6 +16,7 @@ import {
 import { useTorrentDetail, useTorrentDetailActions } from '../hooks/useTorrentDetail';
 import { MoveLocationSheet } from './MoveLocationSheet';
 import { ConfirmDeleteSheet } from './ConfirmDeleteSheet';
+import { trapTabKey } from '../utils/focusTrap';
 
 interface TorrentDetailProps {
   torrent: Torrent;
@@ -35,12 +36,19 @@ export function TorrentDetail({ torrent, onClose, onPause, onResume, onDelete, o
 
   const { properties, files, trackers } = useTorrentDetail(torrent.hash);
   const { recheck, reannounce } = useTorrentDetailActions();
+  const dialogRef = useRef<HTMLDivElement | null>(null);
 
   const isPaused = PAUSED_STATES_SET.has(torrent.state);
 
   useEffect(() => {
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    dialogRef.current?.focus();
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+      if (dialogRef.current) trapTabKey(dialogRef.current, e);
     };
     document.addEventListener('keydown', handler);
     const prev = document.body.style.overflow;
@@ -48,6 +56,7 @@ export function TorrentDetail({ torrent, onClose, onPause, onResume, onDelete, o
     return () => {
       document.removeEventListener('keydown', handler);
       document.body.style.overflow = prev;
+      previouslyFocused?.focus?.();
     };
   }, [onClose]);
 
@@ -87,7 +96,9 @@ export function TorrentDetail({ torrent, onClose, onPause, onResume, onDelete, o
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-gray-50 dark:bg-gray-950 flex flex-col"
+      ref={dialogRef}
+      tabIndex={-1}
+      className="fixed inset-0 z-50 bg-gray-50 dark:bg-gray-950 flex flex-col outline-none"
       role="dialog"
       aria-modal="true"
       aria-label={`Torrent details: ${torrent.name}`}

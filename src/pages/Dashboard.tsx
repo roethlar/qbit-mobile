@@ -17,6 +17,7 @@ import {
   DOWNLOADING_STATES_SET,
   SEEDING_STATES_SET,
 } from '../types/qbittorrent';
+import type { Torrent } from '../types/qbittorrent';
 import type { AddTorrentOptions } from '../components/AddTorrent';
 
 interface DashboardProps {
@@ -41,10 +42,13 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
   const [selectedHashes, setSelectedHashes] = useState<Set<string>>(() => new Set());
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [showBulkMove, setShowBulkMove] = useState(false);
+  const [errorBanner, setErrorBanner] = useState<string | null>(null);
   const successTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => () => {
     if (successTimerRef.current) clearTimeout(successTimerRef.current);
+    if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
   }, []);
 
   const scheduleSuccessDismiss = (msg: string) => {
@@ -52,6 +56,19 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
     if (successTimerRef.current) clearTimeout(successTimerRef.current);
     successTimerRef.current = setTimeout(() => setAddSuccess(null), 3000);
   };
+
+  const flashErrorBanner = useCallback((msg: string) => {
+    setErrorBanner(msg);
+    if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+    errorTimerRef.current = setTimeout(() => setErrorBanner(null), 4000);
+  }, []);
+
+  const reportMutationError = useCallback(
+    (error: unknown) => {
+      flashErrorBanner(extractErrorMessage(error, 'Action failed'));
+    },
+    [flashErrorBanner],
+  );
 
   const { toggleTheme, isDark } = useTheme();
   const online = useOnlineStatus();
@@ -119,6 +136,23 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
     filteredAndSortedTorrents: visibleTorrents,
   } = useTorrentFilters(filteredTorrents);
 
+  // Drop selections that have fallen out of the visible list (filter/search/tag
+  // changed, or the torrent was deleted upstream). Keeps the selection model
+  // honest with what the user can see/select in the toolbar.
+  useEffect(() => {
+    setSelectedHashes((prev) => {
+      if (prev.size === 0) return prev;
+      const visible = new Set(visibleTorrents.map((t) => t.hash));
+      let changed = false;
+      const next = new Set<string>();
+      for (const hash of prev) {
+        if (visible.has(hash)) next.add(hash);
+        else changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [visibleTorrents]);
+
   // Tag list is computed from the *raw* torrent set so the tag UI doesn't
   // disappear when the top-bar filter happens to exclude every tagged
   // torrent. A persisted selectedTag stays clearable even when no current
@@ -168,25 +202,77 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
 
   const handleBulkPause = () => {
     if (selectedHashes.size === 0) return;
-    pauseTorrents.mutate(Array.from(selectedHashes), { onSuccess: exitSelectMode });
+    pauseTorrents.mutate(Array.from(selectedHashes), {
+      onSuccess: exitSelectMode,
+      onError: reportMutationError,
+    });
   };
   const handleBulkResume = () => {
     if (selectedHashes.size === 0) return;
-    resumeTorrents.mutate(Array.from(selectedHashes), { onSuccess: exitSelectMode });
+    resumeTorrents.mutate(Array.from(selectedHashes), {
+      onSuccess: exitSelectMode,
+      onError: reportMutationError,
+    });
   };
   const handleBulkDelete = (deleteFiles: boolean) => {
     if (selectedHashes.size === 0) return;
     deleteTorrents.mutate(
       { hashes: Array.from(selectedHashes), deleteFiles },
-      { onSuccess: () => { setShowBulkDeleteConfirm(false); exitSelectMode(); } },
+      {
+        onSuccess: () => { setShowBulkDeleteConfirm(false); exitSelectMode(); },
+        onError: reportMutationError,
+      },
     );
   };
   const handleBulkMove = async (location: string) => {
     if (selectedHashes.size === 0) return;
-    await setLocation.mutateAsync({ hashes: Array.from(selectedHashes), location });
-    setShowBulkMove(false);
-    exitSelectMode();
+    try {
+      await setLocation.mutateAsync({ hashes: Array.from(selectedHashes), location });
+      setShowBulkMove(false);
+      exitSelectMode();
+    } catch (err) {
+      reportMutationError(err);
+      throw err; // let MoveLocationSheet keep the sheet open + show its own error
+    }
   };
+
+  // Stable callbacks so CompactTorrentRow's React.memo isn't defeated by the
+  // Dashboard re-rendering on every search keystroke.
+  const handleRowPause = useCallback(
+    (hash: string) => {
+      pauseTorrent.mutate(hash, { onError: reportMutationError });
+    },
+    [pauseTorrent, reportMutationError],
+  );
+  const handleRowResume = useCallback(
+    (hash: string) => {
+      resumeTorrent.mutate(hash, { onError: reportMutationError });
+    },
+    [resumeTorrent, reportMutationError],
+  );
+  const handleRowDelete = useCallback(
+    (hash: string, deleteFiles?: boolean) => {
+      deleteTorrent.mutate(
+        { hash, deleteFiles },
+        { onError: reportMutationError },
+      );
+    },
+    [deleteTorrent, reportMutationError],
+  );
+  const handleRowSetLocation = useCallback(
+    (hashes: string[], location: string) =>
+      setLocation
+        .mutateAsync({ hashes, location })
+        .then(() => undefined)
+        .catch((err: unknown) => {
+          reportMutationError(err);
+          throw err;
+        }),
+    [setLocation, reportMutationError],
+  );
+  const handleTorrentClick = useCallback((t: Torrent) => {
+    setSelectedHash(t.hash);
+  }, []);
 
   const selectAllVisible = () => {
     setSelectedHashes((prev) => {
@@ -341,6 +427,24 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
         </div>
       )}
 
+      {errorBanner && (
+        <div
+          role="alert"
+          className="mx-4 mt-2 mb-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl flex items-center justify-between gap-3"
+        >
+          <p className="text-red-800 dark:text-red-300 text-sm font-medium flex-1 break-words">
+            {errorBanner}
+          </p>
+          <button
+            onClick={() => setErrorBanner(null)}
+            aria-label="Dismiss error"
+            className="text-red-800 dark:text-red-300 text-xs font-medium underline active:opacity-70 flex-shrink-0"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {addSuccess && (
         <div className="mx-4 mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl">
           <p className="text-green-800 dark:text-green-300 text-sm font-medium">{addSuccess}</p>
@@ -351,13 +455,11 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
         <CompactTorrentList
           visibleTorrents={visibleTorrents}
           unfilteredCount={filteredTorrents.length}
-          onPause={(hash) => pauseTorrent.mutate(hash)}
-          onResume={(hash) => resumeTorrent.mutate(hash)}
-          onDelete={(hash, deleteFiles) => deleteTorrent.mutate({ hash, deleteFiles })}
-          onSetLocation={(hashes, location) =>
-            setLocation.mutateAsync({ hashes, location }).then(() => undefined)
-          }
-          onTorrentClick={(t) => setSelectedHash(t.hash)}
+          onPause={handleRowPause}
+          onResume={handleRowResume}
+          onDelete={handleRowDelete}
+          onSetLocation={handleRowSetLocation}
+          onTorrentClick={handleTorrentClick}
           selectMode={selectMode}
           selectedHashes={selectedHashes}
           onToggleSelect={toggleSelect}
@@ -442,12 +544,10 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
         <TorrentDetail
           torrent={selectedTorrent}
           onClose={() => setSelectedHash(null)}
-          onPause={(hash) => pauseTorrent.mutate(hash)}
-          onResume={(hash) => resumeTorrent.mutate(hash)}
-          onDelete={(hash, deleteFiles) => deleteTorrent.mutate({ hash, deleteFiles })}
-          onSetLocation={(hash, location) =>
-            setLocation.mutateAsync({ hashes: [hash], location }).then(() => undefined)
-          }
+          onPause={handleRowPause}
+          onResume={handleRowResume}
+          onDelete={(hash, deleteFiles) => handleRowDelete(hash, deleteFiles)}
+          onSetLocation={(hash, location) => handleRowSetLocation([hash], location)}
         />
       )}
     </Layout>

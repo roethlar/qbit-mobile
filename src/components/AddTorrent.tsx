@@ -69,13 +69,13 @@ export function AddTorrent({ isOpen, onClose, onAddUrl, onAddFile }: AddTorrentP
       await onAddFile(file, options);
       setOptions({});
       onClose();
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Failed to add torrent file');
     } finally {
       setSubmitting(false);
+      // Always reset so the user can re-pick the same file after a failure —
+      // an identical value won't fire onChange otherwise.
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 

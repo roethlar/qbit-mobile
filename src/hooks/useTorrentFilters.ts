@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import type { Torrent } from '../types/qbittorrent';
 import { STATE_PRIORITY, getStateText } from '../utils/formatters';
 
@@ -116,14 +116,18 @@ export function useTorrentFilters(torrents: Torrent[]) {
     localStorage.setItem('qbit-selected-tag', selectedTag);
   }, [selectedTag]);
 
-  const handleSort = (newSortBy: SortField) => {
-    if (sortBy === newSortBy) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(newSortBy);
+  // Stable identity so memoized children (CompactTorrentList) don't re-render
+  // every time the parent re-renders for unrelated state (e.g. search input).
+  const handleSort = useCallback((newSortBy: SortField) => {
+    setSortBy((prevSortBy) => {
+      if (prevSortBy === newSortBy) {
+        setSortOrder((prevOrder) => (prevOrder === 'asc' ? 'desc' : 'asc'));
+        return prevSortBy;
+      }
       setSortOrder('asc');
-    }
-  };
+      return newSortBy;
+    });
+  }, []);
 
   return {
     searchQuery,

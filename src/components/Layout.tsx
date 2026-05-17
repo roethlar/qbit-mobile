@@ -1,6 +1,7 @@
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import { clsx } from 'clsx';
+import { trapTabKey } from '../utils/focusTrap';
 
 interface LayoutProps {
   children: ReactNode;
@@ -92,10 +93,20 @@ interface BottomSheetProps {
 }
 
 export function BottomSheet({ isOpen, onClose, title, children }: BottomSheetProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
   useEffect(() => {
     if (!isOpen) return;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    // Focus the container so screen readers announce the dialog and keyboard
+    // tabbing starts from inside.
+    containerRef.current?.focus();
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+      if (containerRef.current) trapTabKey(containerRef.current, e);
     };
     document.addEventListener('keydown', handleKey);
     const prevOverflow = document.body.style.overflow;
@@ -103,6 +114,9 @@ export function BottomSheet({ isOpen, onClose, title, children }: BottomSheetPro
     return () => {
       document.removeEventListener('keydown', handleKey);
       document.body.style.overflow = prevOverflow;
+      // Restore focus to the trigger so keyboard users land back where they
+      // were when the sheet opened.
+      previouslyFocused?.focus?.();
     };
   }, [isOpen, onClose]);
 
@@ -116,9 +130,13 @@ export function BottomSheet({ isOpen, onClose, title, children }: BottomSheetPro
       aria-label={title || 'Sheet'}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="relative w-full bg-white dark:bg-gray-850 rounded-t-3xl shadow-xl max-h-[90vh] overflow-hidden">
+      <div
+        ref={containerRef}
+        tabIndex={-1}
+        className="relative w-full bg-white dark:bg-gray-850 rounded-t-3xl shadow-xl max-h-[90vh] overflow-hidden flex flex-col outline-none"
+      >
         {title && (
-          <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-700">
+          <div className="flex-shrink-0 flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-700">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{title}</h2>
             <button
               onClick={onClose}
@@ -129,7 +147,7 @@ export function BottomSheet({ isOpen, onClose, title, children }: BottomSheetPro
             </button>
           </div>
         )}
-        <div className="overflow-y-auto pb-safe">
+        <div className="flex-1 overflow-y-auto pb-safe">
           {children}
         </div>
       </div>
