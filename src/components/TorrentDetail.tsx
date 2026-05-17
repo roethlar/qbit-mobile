@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { X, Play, Pause, Trash2, RefreshCw, Radio, FileText, Server } from 'lucide-react';
+import { X, Play, Pause, Trash2, RefreshCw, Radio, FileText, Server, FolderInput } from 'lucide-react';
 import { clsx } from 'clsx';
 import type { Torrent, TorrentFile, TorrentTracker } from '../types/qbittorrent';
 import { PAUSED_STATES_SET } from '../types/qbittorrent';
@@ -14,6 +14,7 @@ import {
   getStateText,
 } from '../utils/formatters';
 import { useTorrentDetail, useTorrentDetailActions } from '../hooks/useTorrentDetail';
+import { MoveLocationSheet } from './MoveLocationSheet';
 
 interface TorrentDetailProps {
   torrent: Torrent;
@@ -21,13 +22,15 @@ interface TorrentDetailProps {
   onPause: (hash: string) => void;
   onResume: (hash: string) => void;
   onDelete: (hash: string, deleteFiles: boolean) => void;
+  onSetLocation: (hash: string, location: string) => Promise<void>;
 }
 
 type Tab = 'general' | 'files' | 'trackers';
 
-export function TorrentDetail({ torrent, onClose, onPause, onResume, onDelete }: TorrentDetailProps) {
+export function TorrentDetail({ torrent, onClose, onPause, onResume, onDelete, onSetLocation }: TorrentDetailProps) {
   const [tab, setTab] = useState<Tab>('general');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showMove, setShowMove] = useState(false);
 
   const { properties, files, trackers } = useTorrentDetail(torrent.hash);
   const { recheck, reannounce } = useTorrentDetailActions();
@@ -160,12 +163,17 @@ export function TorrentDetail({ torrent, onClose, onPause, onResume, onDelete }:
       )}
 
       <footer className="border-t border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 py-2 pb-safe">
-        <div className="grid grid-cols-4 gap-1">
+        <div className="grid grid-cols-5 gap-1">
           <ActionButton
             label={isPaused ? 'Resume' : 'Pause'}
             icon={isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
             onClick={handlePauseResume}
             tone={isPaused ? 'positive' : 'neutral'}
+          />
+          <ActionButton
+            label="Move"
+            icon={<FolderInput className="w-4 h-4" />}
+            onClick={() => setShowMove(true)}
           />
           <ActionButton
             label="Recheck"
@@ -187,6 +195,14 @@ export function TorrentDetail({ torrent, onClose, onPause, onResume, onDelete }:
           />
         </div>
       </footer>
+
+      <MoveLocationSheet
+        isOpen={showMove}
+        onClose={() => setShowMove(false)}
+        subject={torrent.name}
+        currentPath={torrent.save_path}
+        onSubmit={(location) => onSetLocation(torrent.hash, location)}
+      />
 
       {showDeleteConfirm && (
         <div

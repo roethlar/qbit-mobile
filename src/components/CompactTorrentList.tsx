@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, memo } from 'react';
 import {
-  Play, Pause, Trash2, RefreshCw, Radio, FolderInput,
+  Play, Pause, Trash2, FolderInput,
   Search, X, ArrowUpDown, ArrowUp, ArrowDown, Tag, Check, ChevronDown, ChevronRight,
 } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -12,7 +12,6 @@ import {
 } from '../utils/formatters';
 import { BottomSheet } from './Layout';
 import type { SortField, SortOrder } from '../hooks/useTorrentFilters';
-import { useTorrentDetailActions } from '../hooks/useTorrentDetail';
 import { MoveLocationSheet } from './MoveLocationSheet';
 import { clsx } from 'clsx';
 
@@ -71,8 +70,6 @@ export function CompactTorrentList({
   const [showTags, setShowTags] = useState(false);
   const [showSortOptions, setShowSortOptions] = useState(false);
 
-  const { recheck, reannounce } = useTorrentDetailActions();
-
   const parentRef = useRef<HTMLDivElement | null>(null);
   const rowVirtualizer = useVirtualizer({
     count: visibleTorrents.length,
@@ -93,17 +90,11 @@ export function CompactTorrentList({
   }, [selectMode, onToggleSelect]);
 
   const handleRowAction = useCallback(
-    (torrent: Torrent, action: 'toggle' | 'recheck' | 'reannounce' | 'delete' | 'move' | 'detail') => {
+    (torrent: Torrent, action: RowAction) => {
       switch (action) {
         case 'toggle':
           if (isPausedState(torrent.state)) onResume(torrent.hash);
           else onPause(torrent.hash);
-          break;
-        case 'recheck':
-          recheck.mutate(torrent.hash);
-          break;
-        case 'reannounce':
-          reannounce.mutate(torrent.hash);
           break;
         case 'delete':
           setPendingDelete(torrent);
@@ -116,7 +107,18 @@ export function CompactTorrentList({
           break;
       }
     },
-    [onPause, onResume, onTorrentClick, recheck, reannounce],
+    [onPause, onResume, onTorrentClick],
+  );
+
+  // Swipe gestures funnel into the same confirmation flows as the action grid
+  // and bulk-select toolbar, so destructive actions always require a tap to
+  // commit.
+  const handleSwipeAction = useCallback(
+    (torrent: Torrent, action: 'move' | 'delete') => {
+      if (action === 'delete') setPendingDelete(torrent);
+      else setPendingMove(torrent);
+    },
+    [],
   );
 
   const handleDelete = (deleteFiles: boolean) => {
@@ -312,8 +314,7 @@ export function CompactTorrentList({
                   isExpanded={expandedHash === torrent.hash}
                   onClick={handleRowClick}
                   onAction={handleRowAction}
-                  recheckPending={recheck.isPending && recheck.variables === torrent.hash}
-                  reannouncePending={reannounce.isPending && reannounce.variables === torrent.hash}
+                  onSwipeAction={handleSwipeAction}
                 />
               </div>
             );
@@ -369,7 +370,16 @@ export function CompactTorrentList({
   );
 }
 
-type RowAction = 'toggle' | 'recheck' | 'reannounce' | 'delete' | 'move' | 'detail';
+type RowAction = 'toggle' | 'delete' | 'move' | 'detail';
+type SwipeAction = 'move' | 'delete';
+
+// Swipe must travel this far before we commit the action on touchend. The max
+// is a soft cap so the row doesn't shoot off-screen if the user keeps dragging.
+const SWIPE_COMMIT_PX = 90;
+const SWIPE_MAX_PX = 180;
+// Threshold for deciding the gesture is horizontal vs vertical scroll. Smaller
+// than COMMIT so the reveal starts before the user is sure they'll commit.
+const SWIPE_DECIDE_PX = 8;
 
 interface CompactTorrentRowProps {
   torrent: Torrent;
@@ -378,8 +388,7 @@ interface CompactTorrentRowProps {
   isExpanded: boolean;
   onClick: (torrent: Torrent) => void;
   onAction: (torrent: Torrent, action: RowAction) => void;
-  recheckPending: boolean;
-  reannouncePending: boolean;
+  onSwipeAction: (torrent: Torrent, action: SwipeAction) => void;
 }
 
 const CompactTorrentRow = memo(function CompactTorrentRow({
@@ -389,104 +398,211 @@ const CompactTorrentRow = memo(function CompactTorrentRow({
   isExpanded,
   onClick,
   onAction,
-  recheckPending,
-  reannouncePending,
+  onSwipeAction,
 }: CompactTorrentRowProps) {
   const isActive = torrent.state === 'downloading' || torrent.state === 'uploading';
   const isPaused = isPausedState(torrent.state);
 
+  const [swipeDx, setSwipeDx] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  // Tracks the in-progress gesture so the move handler can decide horizontal
+  // vs vertical lock. null when no finger is down. After a swipe commits,
+  // justSwipedRef suppresses the synthetic click that follows touchend.
+  const startRef = useRef<{ x: number; y: number; locked: 'h' | 'v' | null } | null>(null);
+  const justSwipedRef = useRef(false);
+
+  // Swipe is disabled in select mode (checkboxes are the primary control) and
+  // in the expanded state (sliding the entire detail panel is jarring).
+  const swipeEnabled = !selectMode && !isExpanded;
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (!swipeEnabled) return;
+    const t = e.touches[0];
+    startRef.current = { x: t.clientX, y: t.clientY, locked: null };
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const start = startRef.current;
+    if (!start) return;
+    const t = e.touches[0];
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    if (start.locked === null) {
+      if (Math.abs(dx) > SWIPE_DECIDE_PX && Math.abs(dx) > Math.abs(dy) * 1.3) {
+        start.locked = 'h';
+        setIsDragging(true);
+      } else if (Math.abs(dy) > SWIPE_DECIDE_PX) {
+        // Vertical scroll wins. Release this gesture so we don't fight the
+        // browser's scroll while the finger keeps moving.
+        startRef.current = null;
+        return;
+      } else {
+        return;
+      }
+    }
+    if (start.locked === 'h') {
+      setSwipeDx(Math.max(-SWIPE_MAX_PX, Math.min(SWIPE_MAX_PX, dx)));
+    }
+  };
+
+  const handleTouchEnd = () => {
+    const dx = swipeDx;
+    startRef.current = null;
+    setIsDragging(false);
+    if (dx <= -SWIPE_COMMIT_PX) {
+      onSwipeAction(torrent, 'delete');
+      justSwipedRef.current = true;
+    } else if (dx >= SWIPE_COMMIT_PX) {
+      onSwipeAction(torrent, 'move');
+      justSwipedRef.current = true;
+    }
+    setSwipeDx(0);
+  };
+
+  const handleRowClickGuarded = () => {
+    // A committed swipe also fires a synthetic click on touchend. Suppress one
+    // click after a swipe so it doesn't immediately expand the row.
+    if (justSwipedRef.current) {
+      justSwipedRef.current = false;
+      return;
+    }
+    onClick(torrent);
+  };
+
+  const showMoveReveal = swipeDx > 0;
+  const showDeleteReveal = swipeDx < 0;
+
   return (
     <div
-      className={clsx(
-        'border-b border-gray-100 dark:border-gray-700 px-2 py-1.5 transition-colors cursor-pointer',
-        isSelected
-          ? 'bg-primary-50 dark:bg-primary-900/20 border-l-2 border-l-primary-600'
-          : isExpanded
-            ? 'bg-gray-50 dark:bg-gray-800'
-            : 'active:bg-gray-50 dark:active:bg-gray-700',
-      )}
-      onClick={() => onClick(torrent)}
+      className="relative overflow-hidden"
+      // pan-y lets the browser handle vertical scroll while leaving horizontal
+      // gestures for us. Saves us from preventDefault dances inside touchmove.
+      style={{ touchAction: 'pan-y' }}
     >
-      <div className="flex items-center justify-between">
-        <div className="flex-1 min-w-0 mr-3">
-          <div className="flex items-center">
-            <h3 className="font-medium text-gray-900 dark:text-gray-100 text-xs leading-tight truncate selectable">
-              {torrent.name}
-            </h3>
-            <span className={clsx('ml-2 text-xs font-medium flex-shrink-0', getStateColor(torrent.state))}>
-              {getStateText(torrent.state)}
-            </span>
-          </div>
-
+      {swipeDx !== 0 && (
+        <div className="absolute inset-0 flex pointer-events-none" aria-hidden="true">
           <div
-            className="w-full bg-gray-200 rounded-full h-0.5 mt-0.5"
-            role="progressbar"
-            aria-valuenow={Math.round(torrent.progress * 100)}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-label={`${torrent.name} progress`}
+            className={clsx(
+              'flex-1 bg-blue-600 flex items-center pl-4 transition-opacity',
+              showMoveReveal ? 'opacity-100' : 'opacity-0',
+            )}
           >
-            <div
-              className={clsx(
-                'h-0.5 rounded-full transition-all duration-300',
-                isActive ? 'bg-blue-500' : isPaused ? 'bg-gray-400' : 'bg-green-500'
-              )}
-              style={{ width: `${torrent.progress * 100}%` }}
-            />
+            <FolderInput className="w-5 h-5 text-white" />
+            <span className="ml-2 text-sm font-medium text-white">Move</span>
           </div>
-
-          <div className="flex items-center justify-between text-xs text-gray-600 mt-0.5">
-            <div className="flex items-center space-x-3">
-              <span>{formatProgress(torrent.progress)}</span>
-              <span>{formatBytes(torrent.size)}</span>
-              {(torrent.dlspeed > 0 || torrent.upspeed > 0) && (
-                <div className="flex items-center space-x-1">
-                  {torrent.dlspeed > 0 && (
-                    <span className="text-blue-600">↓{formatSpeed(torrent.dlspeed)}</span>
-                  )}
-                  {torrent.upspeed > 0 && (
-                    <span className="text-green-600">↑{formatSpeed(torrent.upspeed)}</span>
-                  )}
-                </div>
-              )}
-            </div>
+          <div
+            className={clsx(
+              'flex-1 bg-red-600 flex items-center justify-end pr-4 transition-opacity',
+              showDeleteReveal ? 'opacity-100' : 'opacity-0',
+            )}
+          >
+            <span className="mr-2 text-sm font-medium text-white">Delete</span>
+            <Trash2 className="w-5 h-5 text-white" />
           </div>
         </div>
+      )}
 
-        {selectMode ? (
-          <button
-            onClick={(e) => { e.stopPropagation(); onClick(torrent); }}
-            aria-label={isSelected ? `Deselect ${torrent.name}` : `Select ${torrent.name}`}
-            aria-pressed={isSelected}
-            className={clsx(
-              'w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors',
-              isSelected
-                ? 'bg-primary-600 border-primary-600 text-white'
-                : 'border-gray-300 dark:border-gray-500',
-            )}
-          >
-            {isSelected && <Check className="w-4 h-4" />}
-          </button>
-        ) : (
-          <ChevronDown
-            className={clsx(
-              'w-4 h-4 text-gray-400 flex-shrink-0 transition-transform',
-              isExpanded && 'rotate-180',
-            )}
-            aria-hidden="true"
+      <div
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
+        onClick={handleRowClickGuarded}
+        style={{
+          transform: `translateX(${swipeDx}px)`,
+          transition: isDragging ? 'none' : 'transform 200ms ease-out',
+        }}
+        className={clsx(
+          'relative border-b border-gray-100 dark:border-gray-700 px-2 py-1.5 cursor-pointer',
+          // Solid bg so the reveal layer is hidden until the row slides.
+          // Matches the page bg in both themes.
+          'bg-gray-50 dark:bg-gray-950',
+          isSelected
+            ? 'bg-primary-50 dark:bg-primary-900/20 border-l-2 border-l-primary-600'
+            : isExpanded
+              ? 'bg-gray-100 dark:bg-gray-800'
+              : 'active:bg-gray-100 dark:active:bg-gray-800',
+        )}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex-1 min-w-0 mr-3">
+            <div className="flex items-center">
+              <h3 className="font-medium text-gray-900 dark:text-gray-100 text-xs leading-tight truncate selectable">
+                {torrent.name}
+              </h3>
+              <span className={clsx('ml-2 text-xs font-medium flex-shrink-0', getStateColor(torrent.state))}>
+                {getStateText(torrent.state)}
+              </span>
+            </div>
+
+            <div
+              className="w-full bg-gray-200 rounded-full h-0.5 mt-0.5"
+              role="progressbar"
+              aria-valuenow={Math.round(torrent.progress * 100)}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={`${torrent.name} progress`}
+            >
+              <div
+                className={clsx(
+                  'h-0.5 rounded-full transition-all duration-300',
+                  isActive ? 'bg-blue-500' : isPaused ? 'bg-gray-400' : 'bg-green-500'
+                )}
+                style={{ width: `${torrent.progress * 100}%` }}
+              />
+            </div>
+
+            <div className="flex items-center justify-between text-xs text-gray-600 mt-0.5">
+              <div className="flex items-center space-x-3">
+                <span>{formatProgress(torrent.progress)}</span>
+                <span>{formatBytes(torrent.size)}</span>
+                {(torrent.dlspeed > 0 || torrent.upspeed > 0) && (
+                  <div className="flex items-center space-x-1">
+                    {torrent.dlspeed > 0 && (
+                      <span className="text-blue-600">↓{formatSpeed(torrent.dlspeed)}</span>
+                    )}
+                    {torrent.upspeed > 0 && (
+                      <span className="text-green-600">↑{formatSpeed(torrent.upspeed)}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {selectMode ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); onClick(torrent); }}
+              aria-label={isSelected ? `Deselect ${torrent.name}` : `Select ${torrent.name}`}
+              aria-pressed={isSelected}
+              className={clsx(
+                'w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors',
+                isSelected
+                  ? 'bg-primary-600 border-primary-600 text-white'
+                  : 'border-gray-300 dark:border-gray-500',
+              )}
+            >
+              {isSelected && <Check className="w-4 h-4" />}
+            </button>
+          ) : (
+            <ChevronDown
+              className={clsx(
+                'w-4 h-4 text-gray-400 flex-shrink-0 transition-transform',
+                isExpanded && 'rotate-180',
+              )}
+              aria-hidden="true"
+            />
+          )}
+        </div>
+
+        {isExpanded && !selectMode && (
+          <ExpandedDetail
+            torrent={torrent}
+            isPaused={isPaused}
+            onAction={onAction}
           />
         )}
       </div>
-
-      {isExpanded && !selectMode && (
-        <ExpandedDetail
-          torrent={torrent}
-          isPaused={isPaused}
-          onAction={onAction}
-          recheckPending={recheckPending}
-          reannouncePending={reannouncePending}
-        />
-      )}
     </div>
   );
 });
@@ -495,11 +611,9 @@ interface ExpandedDetailProps {
   torrent: Torrent;
   isPaused: boolean;
   onAction: (torrent: Torrent, action: RowAction) => void;
-  recheckPending: boolean;
-  reannouncePending: boolean;
 }
 
-function ExpandedDetail({ torrent, isPaused, onAction, recheckPending, reannouncePending }: ExpandedDetailProps) {
+function ExpandedDetail({ torrent, isPaused, onAction }: ExpandedDetailProps) {
   // Stop click bubble: tapping inside the expansion shouldn't collapse the row.
   return (
     <div
@@ -524,35 +638,12 @@ function ExpandedDetail({ torrent, isPaused, onAction, recheckPending, reannounc
         </div>
       </dl>
 
-      <div className="grid grid-cols-6 gap-1 pt-1">
+      <div className="grid grid-cols-2 gap-2 pt-1">
         <ActionButton
           label={isPaused ? 'Resume' : 'Pause'}
           icon={isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
           tone={isPaused ? 'positive' : 'neutral'}
           onClick={() => onAction(torrent, 'toggle')}
-        />
-        <ActionButton
-          label="Recheck"
-          icon={<RefreshCw className={clsx('w-4 h-4', recheckPending && 'animate-spin')} />}
-          onClick={() => onAction(torrent, 'recheck')}
-          disabled={recheckPending}
-        />
-        <ActionButton
-          label="Reannounce"
-          icon={<Radio className={clsx('w-4 h-4', reannouncePending && 'animate-pulse')} />}
-          onClick={() => onAction(torrent, 'reannounce')}
-          disabled={reannouncePending}
-        />
-        <ActionButton
-          label="Move"
-          icon={<FolderInput className="w-4 h-4" />}
-          onClick={() => onAction(torrent, 'move')}
-        />
-        <ActionButton
-          label="Delete"
-          icon={<Trash2 className="w-4 h-4" />}
-          tone="danger"
-          onClick={() => onAction(torrent, 'delete')}
         />
         <ActionButton
           label="Details"

@@ -478,6 +478,9 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
           onPause={(hash) => pauseTorrent.mutate(hash)}
           onResume={(hash) => resumeTorrent.mutate(hash)}
           onDelete={(hash, deleteFiles) => deleteTorrent.mutate({ hash, deleteFiles })}
+          onSetLocation={(hash, location) =>
+            setLocation.mutateAsync({ hashes: [hash], location }).then(() => undefined)
+          }
         />
       )}
     </Layout>
