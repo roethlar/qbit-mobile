@@ -50,7 +50,7 @@ print_msg "Checking prerequisites..."
 
 NODE_BIN=$(command -v node || true)
 if [ -z "${NODE_BIN}" ]; then
-    print_error "Node.js is not installed. Please install Node.js 18+ first."
+    print_error "Node.js is not installed. Please install Node.js 22+ first."
     exit 1
 fi
 # Resolve symlinks so the systemd unit gets a stable absolute path even when
@@ -58,8 +58,8 @@ fi
 NODE_BIN=$(readlink -f "${NODE_BIN}" 2>/dev/null || echo "${NODE_BIN}")
 
 NODE_VERSION=$("${NODE_BIN}" -v | cut -d'v' -f2 | cut -d'.' -f1)
-if [ "$NODE_VERSION" -lt 18 ]; then
-    print_error "Node.js version 18+ is required. Current version: $(${NODE_BIN} -v)"
+if [ "$NODE_VERSION" -lt 22 ]; then
+    print_error "Node.js version 22+ is required. Current version: $(${NODE_BIN} -v)"
     exit 1
 fi
 

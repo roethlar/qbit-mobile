@@ -14,7 +14,7 @@ A modern, responsive web interface for qBittorrent optimized for mobile devices.
 
 ## Requirements
 
-- Node.js 18+
+- Node.js 22+
 - qBittorrent with Web UI enabled
 - qBittorrent configured to allow local authentication bypass (recommended) or with credentials
 
