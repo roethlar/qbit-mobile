@@ -20,29 +20,47 @@ A modern, responsive web interface for qBittorrent optimized for mobile devices.
 
 ## Installation
 
-### Quick Deploy (Linux)
+### Quick Deploy
+
+Pick the script for your platform. Each one builds the frontend, prompts for `.env` settings, generates a strong password if you leave it blank, and registers a service that auto-starts.
+
+**Linux** (systemd, requires root):
 
 ```bash
-# Clone the repository
 git clone https://github.com/yourusername/qbit-mobile.git
 cd qbit-mobile
-
-# Run the deployment script as root
 sudo ./deploy.sh
 ```
+
+Installs to `/opt/qbit-mobile`, runs as a dedicated `qbitmobile` system user under a hardened systemd unit, persists data under `/opt/qbit-mobile/data`.
+
+**macOS** (launchd LaunchAgent, no sudo):
+
+```bash
+git clone https://github.com/yourusername/qbit-mobile.git
+cd qbit-mobile
+./deploy-macos.sh
+```
+
+Installs to `~/Library/Application Support/qbit-mobile`, runs as the current user via a user-scoped LaunchAgent (`com.qbit-mobile`), logs to `~/Library/Logs/qbit-mobile.log`. Starts at login.
+
+**Windows** (Scheduled Task at logon, PowerShell 7+):
+
+```powershell
+git clone https://github.com/yourusername/qbit-mobile.git
+cd qbit-mobile
+pwsh .\deploy.ps1
+```
+
+Installs to `%LOCALAPPDATA%\qbit-mobile`, registers a per-user Scheduled Task that runs `node.exe server\server.js` hidden at logon, logs to `%LOCALAPPDATA%\qbit-mobile\logs\qbit-mobile.log`. No service install, no UAC prompt.
 
 ### Uninstall
 
 ```bash
-# To completely remove qBit Mobile
-sudo ./uninstall.sh
+sudo ./uninstall.sh          # Linux
+./uninstall-macos.sh         # macOS
+pwsh .\uninstall.ps1         # Windows
 ```
-
-The deployment script will:
-- Install dependencies and build the frontend
-- Interactively collect settings and write `.env`
-- Create a dedicated system user `qbitmobile` for the service
-- Create and start a systemd service `qbit-mobile`
 
 ### Manual Installation
 
