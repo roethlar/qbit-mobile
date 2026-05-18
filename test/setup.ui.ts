@@ -6,13 +6,12 @@ import { afterEach } from 'vitest';
 import { cleanup } from '@testing-library/react';
 
 // Node >= 22 (experimental) ships a `localStorage` global that's undefined
-// without --localstorage-file. That shadows jsdom's working implementation
-// in vitest 2.x: populateGlobal sees `localStorage in global`, treats it as
-// already-present, and skips installing the jsdom-backed getter. Re-bind the
-// jsdom-owned storage onto globalThis so test code can use bare
-// `localStorage` / `sessionStorage` just like the browser.
+// without --localstorage-file. That shadows jsdom's working implementation:
+// populateGlobal sees `localStorage in global`, treats it as already-present,
+// and skips installing the jsdom-backed getter. Re-bind the jsdom-owned
+// storage onto globalThis so test code can use bare `localStorage` /
+// `sessionStorage` just like the browser. Still required on vitest 4 / Node 26.
 {
-  // vitest exposes the JSDOM instance on globalThis.jsdom.
   const dom = (globalThis as { jsdom?: { window: Window } }).jsdom;
   if (dom) {
     for (const name of ['localStorage', 'sessionStorage'] as const) {
