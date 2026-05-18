@@ -50,16 +50,21 @@ print_msg "Checking prerequisites..."
 
 NODE_BIN=$(command -v node || true)
 if [ -z "${NODE_BIN}" ]; then
-    print_error "Node.js is not installed. Please install Node.js 22+ first."
+    print_error "Node.js is not installed. Please install Node.js 22.12+ first."
     exit 1
 fi
 # Resolve symlinks so the systemd unit gets a stable absolute path even when
 # the operator uses nvm/asdf/snap/Volta where 'node' is a shim.
 NODE_BIN=$(readlink -f "${NODE_BIN}" 2>/dev/null || echo "${NODE_BIN}")
 
-NODE_VERSION=$("${NODE_BIN}" -v | cut -d'v' -f2 | cut -d'.' -f1)
-if [ "$NODE_VERSION" -lt 22 ]; then
-    print_error "Node.js version 22+ is required. Current version: $(${NODE_BIN} -v)"
+# Vite 8 / @vitejs/plugin-react require ^20.19.0 || >=22.12.0; we only ship the
+# 22.x branch, so enforce the minor floor too — a bare major check lets
+# 22.0..22.11 slip through and then npm install or the build later breaks.
+NODE_VER_STR=$("${NODE_BIN}" -v | sed 's/^v//')
+NODE_MAJOR=$(echo "$NODE_VER_STR" | cut -d. -f1)
+NODE_MINOR=$(echo "$NODE_VER_STR" | cut -d. -f2)
+if [ "$NODE_MAJOR" -lt 22 ] || { [ "$NODE_MAJOR" -eq 22 ] && [ "$NODE_MINOR" -lt 12 ]; }; then
+    print_error "Node.js 22.12+ is required. Current version: v${NODE_VER_STR}"
     exit 1
 fi
 
