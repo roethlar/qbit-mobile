@@ -1,8 +1,8 @@
 # qBit Mobile deployment for Windows (PowerShell 7+).
 #
 # Installs to $env:LOCALAPPDATA\qbit-mobile and registers a per-user Scheduled
-# Task that runs at logon (no UAC, no service install). The task action runs
-# node.exe directly against server\server.js with the install dir as CWD.
+# Task that runs at logon (no UAC, no service install). The task action runs a
+# small generated PowerShell wrapper that starts node and captures logs.
 #
 # Run as the regular user (not elevated). The script aborts if Node 22.12+
 # isn't on PATH, or if invoked from outside the qbit-mobile repo root.
@@ -18,6 +18,7 @@ $AppName        = 'qbit-mobile'
 $AppDir         = Join-Path $env:LOCALAPPDATA $AppName
 $LogDir         = Join-Path $AppDir 'logs'
 $LogFile        = Join-Path $LogDir 'qbit-mobile.log'
+$RunnerScript   = Join-Path $AppDir 'run-qbit-mobile.ps1'
 $TaskName       = 'qbit-mobile'
 $EnvFile        = Join-Path $AppDir '.env'
 
@@ -45,6 +46,15 @@ if (-not $nodeCmd) {
     exit 1
 }
 $NodeBin = $nodeCmd.Source
+$PwshBin = (Get-Process -Id $PID).Path
+if (-not $PwshBin -or -not (Test-Path $PwshBin)) {
+    $pwshCmd = Get-Command pwsh -ErrorAction SilentlyContinue
+    if (-not $pwshCmd) {
+        Write-Err "PowerShell 7 executable could not be resolved."
+        exit 1
+    }
+    $PwshBin = $pwshCmd.Source
+}
 
 $nodeVer = (& $NodeBin -v).TrimStart('v')
 $verParts = $nodeVer.Split('.')
@@ -341,14 +351,40 @@ try {
 
     Write-Msg "Registering Scheduled Task '$TaskName' (runs at logon)..."
 
+    $runnerBody = @'
+#Requires -Version 7.0
+$ErrorActionPreference = 'Stop'
+
+$AppDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$LogDir = Join-Path $AppDir 'logs'
+$LogFile = Join-Path $LogDir 'qbit-mobile.log'
+
+New-Item -ItemType Directory -Path $LogDir -Force | Out-Null
+Set-Location $AppDir
+
+$timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+"[$timestamp] starting qBit Mobile" | Out-File -FilePath $LogFile -Append -Encoding utf8
+
+& '__NODE_BIN__' 'server\server.js' *>> $LogFile
+$exitCode = if ($null -ne $LASTEXITCODE) { $LASTEXITCODE } else { 0 }
+
+$timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+"[$timestamp] qBit Mobile exited with code $exitCode" | Out-File -FilePath $LogFile -Append -Encoding utf8
+exit $exitCode
+'@
+    $runnerBody = $runnerBody.Replace('__NODE_BIN__', $NodeBin.Replace("'", "''"))
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($RunnerScript, $runnerBody, $utf8NoBom)
+
     if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
         Write-Msg "Removing existing task..."
         Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
         Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
     }
 
-    $action = New-ScheduledTaskAction -Execute $NodeBin `
-        -Argument 'server\server.js' `
+    $taskArgs = "-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$RunnerScript`""
+    $action = New-ScheduledTaskAction -Execute $PwshBin `
+        -Argument $taskArgs `
         -WorkingDirectory $AppDir
     $trigger = New-ScheduledTaskTrigger -AtLogOn -User ([Security.Principal.WindowsIdentity]::GetCurrent().Name)
     $settings = New-ScheduledTaskSettingsSet `

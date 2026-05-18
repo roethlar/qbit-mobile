@@ -43,14 +43,14 @@ if [ -z "${NODE_BIN}" ]; then
     print_error "Node.js is not installed. Install Node.js 22.12+ (e.g., via Homebrew: 'brew install node@22')."
     exit 1
 fi
-# BSD readlink doesn't support -f. Try GNU readlink (greadlink) first, then
-# realpath, then leave the path as-is — `command -v node` already returned an
-# absolute path on PATH-resolved binaries.
-if command -v greadlink >/dev/null 2>&1; then
-    NODE_BIN=$(greadlink -f "${NODE_BIN}" 2>/dev/null || echo "${NODE_BIN}")
-elif command -v realpath >/dev/null 2>&1; then
-    NODE_BIN=$(realpath "${NODE_BIN}" 2>/dev/null || echo "${NODE_BIN}")
-fi
+# Keep Homebrew's stable /opt/homebrew/bin/node or /usr/local/bin/node symlink
+# instead of resolving into a versioned Cellar path that can disappear after
+# `brew upgrade && brew cleanup`. If command -v ever returns a relative path,
+# make it absolute without following the final symlink.
+case "${NODE_BIN}" in
+    /*) ;;
+    *) NODE_BIN="$(cd "$(dirname "${NODE_BIN}")" && pwd -P)/$(basename "${NODE_BIN}")" ;;
+esac
 
 NODE_VER_STR=$("${NODE_BIN}" -v | sed 's/^v//')
 NODE_MAJOR=$(echo "$NODE_VER_STR" | cut -d. -f1)
@@ -396,11 +396,31 @@ if launchctl print "${GUI_TARGET}/${PLIST_LABEL}" 2>/dev/null | grep -qE 'state\
     print_msg "========================================="
     print_msg "qBit Mobile has been deployed successfully!"
     print_msg ""
-    ENV_QB_HOST=$(grep ^QBITTORRENT_HOST= "${ENV_FILE}" | cut -d= -f2- 2>/dev/null || echo "localhost")
-    ENV_QB_PORT=$(grep ^QBITTORRENT_PORT= "${ENV_FILE}" | cut -d= -f2- 2>/dev/null || echo "8080")
-    ENV_PORT=$(grep ^PORT= "${ENV_FILE}" | cut -d= -f2- 2>/dev/null || echo "3000")
-    ENV_AUTH=$(grep ^AUTH_MODE= "${ENV_FILE}" | cut -d= -f2- 2>/dev/null || echo "basic")
-    ENV_USER=$(grep ^APP_USERNAME= "${ENV_FILE}" | cut -d= -f2- 2>/dev/null || echo "")
+    read_env_value() {
+        local key="$1"
+        local default="$2"
+        local line raw
+        line=$(grep -E "^${key}=" "${ENV_FILE}" | head -n1 || true)
+        if [ -z "${line}" ]; then
+            printf '%s' "${default}"
+            return
+        fi
+        raw="${line#*=}"
+        raw="${raw%$'\r'}"
+        if [[ "${raw}" == \"*\" && "${raw}" == *\" ]]; then
+            raw="${raw:1:${#raw}-2}"
+            raw="${raw//\\\"/\"}"
+            raw="${raw//\\\$/\$}"
+            raw="${raw//\\\\/\\}"
+        fi
+        printf '%s' "${raw}"
+    }
+
+    ENV_QB_HOST=$(read_env_value QBITTORRENT_HOST "localhost")
+    ENV_QB_PORT=$(read_env_value QBITTORRENT_PORT "8080")
+    ENV_PORT=$(read_env_value PORT "3000")
+    ENV_AUTH=$(read_env_value AUTH_MODE "basic")
+    ENV_USER=$(read_env_value APP_USERNAME "")
     print_msg "Configuration:"
     print_msg "  Install dir: ${APP_DIR}"
     print_msg "  Web UI port: ${ENV_PORT}"

@@ -30,14 +30,19 @@ if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
     Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
 }
 
-# Also clean up any lingering node.exe instances running our server.js.
-# (Scheduled Tasks normally stop the process on unregister, but a stuck
-# task instance can leave the child alive.)
-$ourServer = Join-Path $AppDir 'server\server.js'
-$leftovers = Get-CimInstance Win32_Process -Filter "Name = 'node.exe'" -ErrorAction SilentlyContinue |
-    Where-Object { $_.CommandLine -and $_.CommandLine -like "*$ourServer*" }
+# Also clean up any lingering task wrapper or node.exe instances running this
+# install. Scheduled Tasks normally stop the process tree on unregister, but a
+# stuck task instance can leave a child alive.
+$runnerScript = Join-Path $AppDir 'run-qbit-mobile.ps1'
+$leftovers = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+    Where-Object {
+        $_.CommandLine -and
+        ($_.Name -in @('node.exe', 'pwsh.exe', 'powershell.exe')) -and
+        $_.CommandLine -like "*$AppDir*" -and
+        ($_.CommandLine -like '*server.js*' -or $_.CommandLine -like "*$runnerScript*")
+    }
 foreach ($p in $leftovers) {
-    Write-Msg "Terminating leftover node.exe (pid $($p.ProcessId))..."
+    Write-Msg "Terminating leftover $($p.Name) (pid $($p.ProcessId))..."
     Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue
 }
 

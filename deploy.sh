@@ -495,11 +495,31 @@ if systemctl is-active --quiet "${SERVICE_NAME}"; then
     print_msg "========================================="
     print_msg "qBit Mobile has been deployed successfully!"
     print_msg ""
-    ENV_QB_HOST=$(grep ^QBITTORRENT_HOST= "${ENV_FILE}" | cut -d= -f2- 2>/dev/null || echo "localhost")
-    ENV_QB_PORT=$(grep ^QBITTORRENT_PORT= "${ENV_FILE}" | cut -d= -f2- 2>/dev/null || echo "8080")
-    ENV_PORT=$(grep ^PORT= "${ENV_FILE}" | cut -d= -f2- 2>/dev/null || echo "3000")
-    ENV_AUTH=$(grep ^AUTH_MODE= "${ENV_FILE}" | cut -d= -f2- 2>/dev/null || echo "basic")
-    ENV_USER=$(grep ^APP_USERNAME= "${ENV_FILE}" | cut -d= -f2- 2>/dev/null || echo "")
+    read_env_value() {
+        local key="$1"
+        local default="$2"
+        local line raw
+        line=$(grep -E "^${key}=" "${ENV_FILE}" | head -n1 || true)
+        if [ -z "${line}" ]; then
+            printf '%s' "${default}"
+            return
+        fi
+        raw="${line#*=}"
+        raw="${raw%$'\r'}"
+        if [[ "${raw}" == \"*\" && "${raw}" == *\" ]]; then
+            raw="${raw:1:${#raw}-2}"
+            raw="${raw//\\\"/\"}"
+            raw="${raw//\\\$/\$}"
+            raw="${raw//\\\\/\\}"
+        fi
+        printf '%s' "${raw}"
+    }
+
+    ENV_QB_HOST=$(read_env_value QBITTORRENT_HOST "localhost")
+    ENV_QB_PORT=$(read_env_value QBITTORRENT_PORT "8080")
+    ENV_PORT=$(read_env_value PORT "3000")
+    ENV_AUTH=$(read_env_value AUTH_MODE "basic")
+    ENV_USER=$(read_env_value APP_USERNAME "")
     print_msg "Configuration:"
     print_msg "  Service user: ${SERVICE_USER}"
     print_msg "  Web UI port: ${ENV_PORT}"
