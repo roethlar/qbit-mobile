@@ -111,6 +111,10 @@ QBITTORRENT_HOST=localhost
 QBITTORRENT_PORT=8080
 QBITTORRENT_USERNAME=          # optional; leave blank for local bypass
 QBITTORRENT_PASSWORD=
+
+# Reverse proxy / CORS (optional)
+TRUST_PROXY=                   # set when behind a proxy that sets X-Forwarded-* headers
+ALLOWED_ORIGIN=                # allow exactly one extra cross-origin web client
 ```
 
 ### App authentication
@@ -120,6 +124,13 @@ This app is designed to be reached from a phone on your LAN, so binding to `0.0.
 `AUTH_MODE=disabled` is available for trusted-LAN setups where you've already gated access at the network or reverse-proxy layer. The server prints a loud warning at boot if it's disabled while bound to a non-loopback interface.
 
 The proxy only forwards a curated set of qBittorrent endpoints — `/torrents/{info,properties,files,trackers}`, `/transfer/info`, `/app/{preferences,version,webapiVersion}`, `/torrents/{stop,start,delete,add,recheck,reannounce,setLocation}`, and `/app/setPreferences` (with a key allowlist). Dangerous endpoints like `/app/shutdown` and RCE-enabling preference keys like `autorun_program` are not reachable through the proxy even when authenticated.
+
+### Reverse proxy and CORS
+
+Both settings are optional and only matter for specific deployments — leave them blank otherwise.
+
+- `TRUST_PROXY` — set this when the app runs behind a reverse proxy (nginx, Caddy, Traefik) that terminates TLS and sets `X-Forwarded-*` headers, so the server reads the real client protocol and IP. The value is passed straight to Express's [`trust proxy`](https://expressjs.com/en/guide/behind-proxies.html) setting: use `1` to trust one proxy hop, or a keyword like `loopback`, `linklocal`, or `uniquelocal`.
+- `ALLOWED_ORIGIN` — same-origin browser requests (the app calling its own server) work without this. Set it only when a separate web origin must call the API; it whitelists exactly one extra origin (e.g. `https://qbit.example.com`) for cross-origin requests. Cross-origin writes are rejected when it's unset.
 
 ### Move-to location presets
 
