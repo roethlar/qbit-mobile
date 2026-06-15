@@ -219,6 +219,12 @@ write_env_file() {
     local qb_user="$8"
     local qb_pass="$9"
 
+    # Create the file with locked-down perms BEFORE writing any secret so the
+    # password is never briefly readable by other local users under a default
+    # umask. The final chmod later is kept as belt-and-suspenders.
+    : > "${ENV_FILE}"
+    chmod 600 "${ENV_FILE}"
+
     {
         printf '%s\n' '# qBit Mobile Configuration'
         printf '\n'
@@ -314,6 +320,9 @@ else
         print_warning "Your existing .env predates v1.1 and is missing AUTH_MODE / APP_USERNAME / APP_PASSWORD."
         existing_host=$(grep -E '^HOST=' "${ENV_FILE}" | head -n1 | cut -d= -f2- || true)
         prompt_app_auth "${existing_host:-0.0.0.0}"
+        # Lock perms before appending secrets in case a hand-created pre-1.1
+        # .env was left readable by other local users.
+        chmod 600 "${ENV_FILE}"
         append_auth_to_env
         print_msg "Added the new auth keys to ${ENV_FILE}."
     fi

@@ -310,6 +310,12 @@ write_env_file() {
     local qb_user="$8"
     local qb_pass="$9"
 
+    # Create the file with locked-down perms BEFORE writing any secret so the
+    # password is never briefly world-readable under a default umask. The
+    # final chmod later is kept as belt-and-suspenders.
+    : > "${ENV_FILE}"
+    chmod 640 "${ENV_FILE}"
+
     # Use printf so $-expansion / backticks in values don't get interpreted,
     # and quote every value so dotenv parses passwords with # or whitespace
     # correctly. The escape_env_value helper handles \, ", $ inside the quotes.
@@ -412,6 +418,9 @@ else
         print_warning "AUTH_MODE / APP_USERNAME / APP_PASSWORD keys that v1.1 requires."
         existing_host=$(grep -E '^HOST=' "${ENV_FILE}" | head -n1 | cut -d= -f2- || true)
         prompt_app_auth "${existing_host:-0.0.0.0}"
+        # Lock perms before appending secrets in case a hand-created pre-1.1
+        # .env was left world-readable.
+        chmod 640 "${ENV_FILE}"
         append_auth_to_env
         print_msg "Added the new auth keys to ${ENV_FILE}."
     fi
