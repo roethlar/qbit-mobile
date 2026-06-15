@@ -433,7 +433,8 @@ app.post('/api/v2/app/setPreferences', async (req, res) => {
         return res.status(400).json({ error: `Invalid value for "${key}"` });
       }
     } else if (key === 'save_path') {
-      if (typeof value !== 'string' || value.length > 4096 || /[\0\r\n]/.test(value)) {
+      // eslint-disable-next-line no-control-regex
+      if (typeof value !== 'string' || value.length > 4096 || /[\x00-\x1f]/.test(value)) {
         return res.status(400).json({ error: 'Invalid value for "save_path"' });
       }
     } else if (key === 'add_stopped_enabled') {

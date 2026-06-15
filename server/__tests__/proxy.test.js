@@ -155,6 +155,16 @@ describe('setPreferences key filter', () => {
     expect(parsed.web_ui_password).toBeUndefined();
   });
 
+  it('rejects a save_path containing control characters', async () => {
+    const res = await request(app)
+      .post('/api/v2/app/setPreferences')
+      .auth(...CREDS)
+      .type('form')
+      .send({ json: JSON.stringify({ save_path: '/tmp/\tevil' }) });
+    expect(res.status).toBe(400);
+    expect(axiosMock).not.toHaveBeenCalled();
+  });
+
   it('rejects malformed JSON body', async () => {
     const res = await request(app)
       .post('/api/v2/app/setPreferences')
