@@ -73,6 +73,16 @@ if ! command -v npm &> /dev/null; then
     exit 1
 fi
 
+# Refuse to run anywhere but the repo root. The copy step below deletes the
+# installed server/src/public first; from the wrong CWD that would wipe the
+# live install and then fail on the copy.
+for required in server src public package.json; do
+    if [ ! -e "${required}" ]; then
+        print_error "Run this script from the qbit-mobile repo root (missing ./${required})."
+        exit 1
+    fi
+done
+
 print_msg "Creating application directory at ${APP_DIR}..."
 mkdir -p "${APP_DIR}"
 

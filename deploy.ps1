@@ -71,9 +71,14 @@ if (-not $npmCmd) {
     exit 1
 }
 
-if (-not (Test-Path 'package.json') -or -not (Test-Path 'server')) {
-    Write-Err "Run this script from the qbit-mobile repo root (where package.json and server\ live)."
-    exit 1
+# Refuse to run anywhere but the repo root. The copy step below deletes the
+# installed server/src/public first; from the wrong CWD that would wipe the
+# live install and then fail on the copy.
+foreach ($required in @('server','src','public','package.json')) {
+    if (-not (Test-Path $required)) {
+        Write-Err "Run this script from the qbit-mobile repo root (missing .\$required)."
+        exit 1
+    }
 }
 
 Write-Msg "Creating application directory at $AppDir..."
