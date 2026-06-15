@@ -8,6 +8,9 @@ interface ConfirmDeleteSheetProps {
   // 1 by default. >1 changes the copy to plural ("torrents") and uses a
   // generic warning rather than echoing the subject as a quoted name.
   count?: number;
+  // While true the delete request is in flight: disable the confirm actions so
+  // a double-tap can't issue duplicate deletes before the sheet closes.
+  pending?: boolean;
   onConfirm: (deleteFiles: boolean) => void | Promise<void>;
 }
 
@@ -16,6 +19,7 @@ export function ConfirmDeleteSheet({
   onClose,
   subject,
   count = 1,
+  pending = false,
   onConfirm,
 }: ConfirmDeleteSheetProps) {
   const isBulk = count > 1;
@@ -30,19 +34,22 @@ export function ConfirmDeleteSheet({
         <div className="space-y-2">
           <button
             onClick={() => onConfirm(false)}
-            className="w-full ios-button-secondary"
+            disabled={pending}
+            className="w-full ios-button-secondary disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Delete {noun} only
           </button>
           <button
             onClick={() => onConfirm(true)}
-            className="w-full bg-red-600 text-white rounded-xl py-3 px-6 font-medium active:bg-red-700 transition-colors"
+            disabled={pending}
+            className="w-full bg-red-600 text-white rounded-xl py-3 px-6 font-medium active:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Delete {noun} and files
+            {pending ? 'Deleting…' : `Delete ${noun} and files`}
           </button>
           <button
             onClick={onClose}
-            className="w-full ios-button-secondary"
+            disabled={pending}
+            className="w-full ios-button-secondary disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancel
           </button>

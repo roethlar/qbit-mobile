@@ -522,6 +522,7 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
         onClose={() => setShowBulkDeleteConfirm(false)}
         subject={`${selectedHashes.size} torrent${selectedHashes.size === 1 ? '' : 's'}`}
         count={selectedHashes.size}
+        pending={deleteTorrents.isPending}
         onConfirm={(deleteFiles) => handleBulkDelete(deleteFiles)}
       />
 
