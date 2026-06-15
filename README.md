@@ -129,7 +129,7 @@ This app is designed to be reached from a phone on your LAN, so binding to `0.0.
 
 `AUTH_MODE=disabled` is available for trusted-LAN setups where you've already gated access at the network or reverse-proxy layer. The server prints a loud warning at boot if it's disabled while bound to a non-loopback interface.
 
-The proxy only forwards a curated set of qBittorrent endpoints — `/torrents/{info,properties,files,trackers}`, `/transfer/info`, `/app/{preferences,version,webapiVersion}`, `/torrents/{stop,start,delete,add,recheck,reannounce,setLocation}`, and `/app/setPreferences` (with a key allowlist). Dangerous endpoints like `/app/shutdown` and RCE-enabling preference keys like `autorun_program` are not reachable through the proxy even when authenticated.
+The proxy only forwards a curated set of qBittorrent endpoints — `/torrents/{info,properties,files,trackers}`, `/transfer/info`, `/app/{preferences,version,webapiVersion}`, `/torrents/{stop,start,delete,add,recheck,reannounce,setLocation}`, and `/app/setPreferences` (with a key allowlist). Dangerous endpoints like `/app/shutdown` and RCE-enabling preference keys like `autorun_program` are not reachable through the proxy even when authenticated. The add-torrent endpoint also gates its form fields against an allowlist, and path-writing fields (`savepath`, like `setLocation` and `save_path`) are length-bounded and rejected if they contain control characters.
 
 ### Reverse proxy and CORS
 

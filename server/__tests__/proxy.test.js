@@ -688,6 +688,37 @@ describe('POST /torrents/add (multipart)', () => {
     expect(body).toContain('name="paused"');
     expect(body).not.toMatch(/name="stopped"/);
   });
+
+  it('rejects a savepath containing control characters', async () => {
+    const res = await request(app)
+      .post('/api/v2/torrents/add')
+      .auth(...CREDS)
+      .field('urls', 'magnet:?xt=urn:btih:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee')
+      .field('savepath', '/tmp/evil');
+    expect(res.status).toBe(400);
+    expect(axiosMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects an oversized savepath', async () => {
+    const res = await request(app)
+      .post('/api/v2/torrents/add')
+      .auth(...CREDS)
+      .field('urls', 'magnet:?xt=urn:btih:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee')
+      .field('savepath', '/' + 'x'.repeat(5000));
+    expect(res.status).toBe(400);
+    expect(axiosMock).not.toHaveBeenCalled();
+  });
+
+  it('forwards a valid savepath', async () => {
+    const res = await request(app)
+      .post('/api/v2/torrents/add')
+      .auth(...CREDS)
+      .field('urls', 'magnet:?xt=urn:btih:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee')
+      .field('savepath', '/mnt/dl');
+    expect(res.status).toBe(200);
+    const addCall = axiosMock.mock.calls.find((c) => c[0].url.includes('/torrents/add'));
+    expect(readFormBody(addCall[0].data)).toContain('name="savepath"');
+  });
 });
 
 describe('upstream 401 re-login', () => {

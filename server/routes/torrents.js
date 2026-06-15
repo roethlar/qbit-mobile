@@ -74,6 +74,17 @@ router.post('/torrents/add', uploadFiles, async (req, res) => {
   // API version. Detection is otherwise lazy, so make sure it has run before
   // the form is built — else a qB4 instance silently ignores a "stopped" flag.
   const body = req.body || {};
+  // savepath is a path-writing field; mirror the setLocation / save_path guards
+  // (bounded length, no control characters) so it can't carry newlines or
+  // oversized payloads through the proxy. Empty/absent is allowed (qB default).
+  const savepath = Array.isArray(body.savepath) ? body.savepath[0] : body.savepath;
+  if (savepath !== undefined && savepath !== null && savepath !== '') {
+    const sp = String(savepath);
+    // eslint-disable-next-line no-control-regex
+    if (sp.length > 4096 || /[\x00-\x1f]/.test(sp)) {
+      return res.status(400).json({ error: 'Invalid "savepath"' });
+    }
+  }
   if ('stopped' in body || 'paused' in body) {
     await ensureCapabilitiesDetected();
   }
