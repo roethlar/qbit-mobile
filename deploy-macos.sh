@@ -135,8 +135,10 @@ generate_password() {
     if command -v openssl >/dev/null 2>&1; then
         openssl rand -base64 24 | tr -d '/+=' | cut -c1-24
     else
-        # /dev/urandom is always available on macOS.
-        LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 24
+        # /dev/urandom is always available on macOS. Bounded read + `cut`
+        # (reads to EOF) instead of a trailing `head`, which would SIGPIPE
+        # `tr` and trip `set -o pipefail`.
+        head -c 512 /dev/urandom | LC_ALL=C tr -dc 'A-Za-z0-9' | cut -c1-24
     fi
 }
 

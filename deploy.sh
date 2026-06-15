@@ -218,9 +218,12 @@ generate_password() {
     if command -v openssl >/dev/null 2>&1; then
         openssl rand -base64 24 | tr -d '/+=' | cut -c1-24
     elif [ -r /dev/urandom ]; then
-        tr -dc 'A-Za-z0-9' </dev/urandom | head -c 24
+        # Read a bounded block then take 24 chars with `cut` (which reads to
+        # EOF). A trailing `head -c 24` would close the pipe early and SIGPIPE
+        # the upstream `tr`, tripping `set -o pipefail` and aborting install.
+        head -c 512 /dev/urandom | LC_ALL=C tr -dc 'A-Za-z0-9' | cut -c1-24
     else
-        date +%s%N | sha256sum | head -c 24
+        date +%s%N | sha256sum | cut -c1-24
     fi
 }
 
