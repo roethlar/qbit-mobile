@@ -27,6 +27,7 @@ export default defineConfig({
           include: [
             'src/hooks/**/*.test.{ts,tsx}',
             'src/components/**/*.test.{ts,tsx}',
+            'src/pages/**/*.test.{ts,tsx}',
           ],
           setupFiles: ['./test/setup.ui.ts'],
         },

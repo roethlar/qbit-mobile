@@ -25,6 +25,7 @@ export default defineWorkspace([
       include: [
         'src/hooks/**/*.test.{ts,tsx}',
         'src/components/**/*.test.{ts,tsx}',
+        'src/pages/**/*.test.{ts,tsx}',
       ],
       setupFiles: ['./test/setup.ui.ts'],
       testTimeout: 10_000,

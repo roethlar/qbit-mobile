@@ -33,6 +33,7 @@ export function Settings({ onBack }: SettingsProps) {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+  const [presetsDirty, setPresetsDirty] = useState(false);
   const saveMessageTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
@@ -79,10 +80,11 @@ export function Settings({ onBack }: SettingsProps) {
 
   const isDirty = Object.keys(buildChangeSet()).length > 0;
 
-  // Intercept back navigation when there are unsaved qB pref changes. The
-  // presets card manages its own draft and warns independently.
+  // Intercept back navigation when there are unsaved changes — either the qB
+  // prefs draft here or the presets card's own draft (reported via
+  // onDirtyChange). Discarding is safe: both drafts are ephemeral.
   const handleBack = () => {
-    if (isDirty) {
+    if (isDirty || presetsDirty) {
       setShowDiscardConfirm(true);
       return;
     }
@@ -119,7 +121,7 @@ export function Settings({ onBack }: SettingsProps) {
         <Header
           title="Settings"
           leftButton={
-            <button onClick={handleBack} className="p-1 text-gray-600 hover:text-gray-900">
+            <button onClick={handleBack} aria-label="Back" className="p-1 text-gray-600 hover:text-gray-900">
               <ArrowLeft className="w-5 h-5" />
             </button>
           }
@@ -140,7 +142,7 @@ export function Settings({ onBack }: SettingsProps) {
         <Header
           title="Settings"
           leftButton={
-            <button onClick={handleBack} className="p-1 text-gray-600 hover:text-gray-900">
+            <button onClick={handleBack} aria-label="Back" className="p-1 text-gray-600 hover:text-gray-900">
               <ArrowLeft className="w-5 h-5" />
             </button>
           }
@@ -162,7 +164,7 @@ export function Settings({ onBack }: SettingsProps) {
       <Header
         title="Settings"
         leftButton={
-          <button onClick={onBack} className="p-1 text-gray-600 hover:text-gray-900">
+          <button onClick={handleBack} aria-label="Back" className="p-1 text-gray-600 hover:text-gray-900">
             <ArrowLeft className="w-5 h-5" />
           </button>
         }
@@ -256,7 +258,7 @@ export function Settings({ onBack }: SettingsProps) {
         </div>
 
         {/* Move-to Presets (independent of qB save) */}
-        <LocationPresetsCard />
+        <LocationPresetsCard onDirtyChange={setPresetsDirty} />
 
         {/* New Torrents */}
         <div className="bg-white dark:bg-gray-800 rounded-xl mx-4 p-4">

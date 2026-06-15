@@ -33,7 +33,13 @@ function shallowEqual(a: LocationPreset[], b: LocationPreset[]): boolean {
   return true;
 }
 
-export function LocationPresetsCard() {
+interface LocationPresetsCardProps {
+  // Reports the card's unsaved-edits state to a parent so it can warn before
+  // navigating away. The card otherwise owns its own draft and save/reset.
+  onDirtyChange?: (dirty: boolean) => void;
+}
+
+export function LocationPresetsCard({ onDirtyChange }: LocationPresetsCardProps = {}) {
   const presets = useLocationPresets();
   const update = useUpdateLocationPresets();
   const [draft, setDraft] = useState<DraftRow[]>([]);
@@ -55,6 +61,11 @@ export function LocationPresetsCard() {
   const cleaned = toServerPayload(draft);
   const isDirty = !shallowEqual(cleaned, presets.data ?? []);
   const canSave = isDirty && !update.isPending;
+
+  // Surface dirty state so a parent (Settings) can intercept back navigation.
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
 
   const addRow = () => {
     setDraft((prev) => [...prev, { uid: uidCounter++, name: '', path: '' }]);
