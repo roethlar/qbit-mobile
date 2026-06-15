@@ -704,7 +704,7 @@ describe('POST /torrents/add (multipart)', () => {
       .post('/api/v2/torrents/add')
       .auth(...CREDS)
       .field('urls', 'magnet:?xt=urn:btih:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee')
-      .field('savepath', '/tmp/evil');
+      .field('savepath', '/tmp/\x01evil');
     expect(res.status).toBe(400);
     expect(axiosMock).not.toHaveBeenCalled();
   });
