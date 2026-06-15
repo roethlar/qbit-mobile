@@ -177,7 +177,7 @@ Version 1.1 adds app-level authentication and several `.env` keys. If you're upg
 
   The server now refuses to boot when `AUTH_MODE=basic` (the default) and the credentials are missing. If your install is on a fully trusted LAN where you'd rather not have auth, set `AUTH_MODE=disabled` instead.
 
-- The proxy now only forwards an allowlist of qBittorrent endpoints. If you're using this app's API directly from a custom client and depended on paths beyond `/torrents/{info,stop,start,delete,add}`, `/transfer/info`, `/app/{preferences,setPreferences,version,webapiVersion}`, open an issue.
+- The proxy now only forwards an allowlist of qBittorrent endpoints. If you're using this app's API directly from a custom client and depended on paths beyond `/torrents/{info,properties,files,trackers,stop,start,delete,add,recheck,reannounce,setLocation}`, `/transfer/info`, and `/app/{preferences,setPreferences,version,webapiVersion}`, open an issue.
 
 ## Development
 
