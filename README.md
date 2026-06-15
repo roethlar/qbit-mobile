@@ -33,7 +33,7 @@ Pick the script for your platform. Each one builds the frontend, prompts for `.e
 **Linux** (systemd, requires root):
 
 ```bash
-git clone https://github.com/yourusername/qbit-mobile.git
+git clone https://github.com/roethlar/qbit-mobile.git
 cd qbit-mobile
 sudo ./deploy.sh
 ```
@@ -43,7 +43,7 @@ Installs to `/opt/qbit-mobile`, runs as a dedicated `qbitmobile` system user und
 **macOS** (launchd LaunchAgent, no sudo):
 
 ```bash
-git clone https://github.com/yourusername/qbit-mobile.git
+git clone https://github.com/roethlar/qbit-mobile.git
 cd qbit-mobile
 ./deploy-macos.sh
 ```
@@ -53,7 +53,7 @@ Installs to `~/Library/Application Support/qbit-mobile`, runs as the current use
 **Windows** (Scheduled Task at logon, PowerShell 7+):
 
 ```powershell
-git clone https://github.com/yourusername/qbit-mobile.git
+git clone https://github.com/roethlar/qbit-mobile.git
 cd qbit-mobile
 pwsh .\deploy.ps1
 ```
@@ -240,7 +240,7 @@ Pull requests are welcome! Please feel free to submit a PR.
 
 ## Issues
 
-If you encounter any issues, please report them on the [GitHub issues page](https://github.com/yourusername/qbit-mobile/issues).
+If you encounter any issues, please report them on the [GitHub issues page](https://github.com/roethlar/qbit-mobile/issues).
 
 ## Notes on Compatibility and Security
 
