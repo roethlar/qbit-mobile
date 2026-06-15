@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { useTorrentFilters } from './useTorrentFilters';
 import type { Torrent, TorrentState } from '../types/qbittorrent';
@@ -62,6 +62,25 @@ function makeTorrent(overrides: Partial<Torrent>): Torrent {
 describe('useTorrentFilters', () => {
   beforeEach(() => {
     localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('falls back to defaults without throwing when localStorage is blocked', () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('storage blocked');
+    });
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('storage blocked');
+    });
+    // renderHook propagates a render-time throw, so reaching these assertions
+    // already proves init didn't crash; the values confirm the defaults.
+    const { result } = renderHook(() => useTorrentFilters([]));
+    expect(result.current.sortBy).toBe('name');
+    expect(result.current.sortOrder).toBe('asc');
+    expect(result.current.selectedTag).toBe('');
   });
 
   it('ignores a garbage qbit-sort-by value and defaults to name', () => {

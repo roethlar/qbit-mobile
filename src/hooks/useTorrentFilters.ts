@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import type { Torrent } from '../types/qbittorrent';
 import { STATE_PRIORITY, getStateText } from '../utils/formatters';
+import { readStorage, writeStorage } from '../utils/safeStorage';
 
 const SORT_FIELDS = ['name', 'size', 'progress', 'dlspeed', 'upspeed', 'added_on', 'state'] as const;
 const SORT_ORDERS = ['asc', 'desc'] as const;
@@ -11,15 +12,15 @@ export type SortOrder = typeof SORT_ORDERS[number];
 export function useTorrentFilters(torrents: Torrent[]) {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortField>(() => {
-    const saved = localStorage.getItem('qbit-sort-by');
+    const saved = readStorage('qbit-sort-by');
     return SORT_FIELDS.includes(saved as SortField) ? (saved as SortField) : 'name';
   });
   const [sortOrder, setSortOrder] = useState<SortOrder>(() => {
-    const saved = localStorage.getItem('qbit-sort-order');
+    const saved = readStorage('qbit-sort-order');
     return SORT_ORDERS.includes(saved as SortOrder) ? (saved as SortOrder) : 'asc';
   });
   const [selectedTag, setSelectedTag] = useState<string>(() => {
-    return localStorage.getItem('qbit-selected-tag') || '';
+    return readStorage('qbit-selected-tag') || '';
   });
 
   const availableTags = useMemo(() => {
@@ -105,15 +106,15 @@ export function useTorrentFilters(torrents: Torrent[]) {
   }, [torrents, searchQuery, selectedTag, sortBy, sortOrder]);
 
   useEffect(() => {
-    localStorage.setItem('qbit-sort-by', sortBy);
+    writeStorage('qbit-sort-by', sortBy);
   }, [sortBy]);
 
   useEffect(() => {
-    localStorage.setItem('qbit-sort-order', sortOrder);
+    writeStorage('qbit-sort-order', sortOrder);
   }, [sortOrder]);
 
   useEffect(() => {
-    localStorage.setItem('qbit-selected-tag', selectedTag);
+    writeStorage('qbit-selected-tag', selectedTag);
   }, [selectedTag]);
 
   // Stable identity so memoized children (CompactTorrentList) don't re-render

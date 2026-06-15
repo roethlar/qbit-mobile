@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { readStorage, writeStorage } from '../utils/safeStorage';
 
 type Theme = 'light' | 'dark';
 
@@ -13,7 +14,7 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
     // Check localStorage first, then system preference
-    const saved = localStorage.getItem('theme');
+    const saved = readStorage('theme');
     if (saved === 'light' || saved === 'dark') {
       return saved;
     }
@@ -32,7 +33,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Save to localStorage
-    localStorage.setItem('theme', theme);
+    writeStorage('theme', theme);
     
     // Apply to document
     if (theme === 'dark') {
