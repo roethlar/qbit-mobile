@@ -664,6 +664,30 @@ describe('POST /torrents/add (multipart)', () => {
     expect(body).toContain('name="paused"');
     expect(body).not.toMatch(/name="stopped"/);
   });
+
+  it('detects a legacy API version before mapping stopped when caps are unknown', async () => {
+    // Simulate a fresh process: capabilities not yet probed (the race the lazy
+    // fire-and-forget detection leaves open on a real qB4 instance).
+    __resetCapabilitiesForTests(false);
+    axiosMock.mockImplementation(async (config) => {
+      if (config.url.includes('/app/webapiVersion')) {
+        return { status: 200, data: '2.8.3', headers: {} }; // qB4 / legacy
+      }
+      return { status: 200, data: 'Ok.', headers: {} };
+    });
+    const res = await request(app)
+      .post('/api/v2/torrents/add')
+      .auth(...CREDS)
+      .field('urls', 'magnet:?xt=urn:btih:dddddddddddddddddddddddddddddddddddddddd')
+      .field('stopped', 'true');
+    expect(res.status).toBe(200);
+    // The version probe must have run before the add was built.
+    expect(axiosMock.mock.calls.some((c) => c[0].url.includes('/app/webapiVersion'))).toBe(true);
+    const addCall = axiosMock.mock.calls.find((c) => c[0].url.includes('/torrents/add'));
+    const body = readFormBody(addCall[0].data);
+    expect(body).toContain('name="paused"');
+    expect(body).not.toMatch(/name="stopped"/);
+  });
 });
 
 describe('upstream 401 re-login', () => {

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import FormData from 'form-data';
-import { makeQbRequest, getQbApiCapabilities } from '../qbClient.js';
+import { makeQbRequest, getQbApiCapabilities, ensureCapabilitiesDetected } from '../qbClient.js';
 
 const router = Router();
 
@@ -70,6 +70,13 @@ function buildAddFormData(body, files) {
 }
 
 router.post('/torrents/add', uploadFiles, async (req, res) => {
+  // The stopped<->paused mapping in buildAddFormData branches on the detected
+  // API version. Detection is otherwise lazy, so make sure it has run before
+  // the form is built — else a qB4 instance silently ignores a "stopped" flag.
+  const body = req.body || {};
+  if ('stopped' in body || 'paused' in body) {
+    await ensureCapabilitiesDetected();
+  }
   try {
     const response = await makeQbRequest('POST', '/torrents/add', () => {
       const fd = buildAddFormData(req.body, req.files);

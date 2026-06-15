@@ -14,8 +14,9 @@ let detectInFlight = null;
 let lastDetectAttemptAt = 0;
 // qBittorrent <5.0 (Web API <2.11) uses /torrents/pause and /resume instead of
 // /stop and /start. The preference key is "start_paused_enabled" instead of
-// "add_stopped_enabled". (The add-torrent param is normalized to "paused" on
-// both versions in routes/torrents.js since qB 5.x still accepts it.)
+// "add_stopped_enabled". The add-torrent param is normalized in
+// routes/torrents.js to "stopped" on modern qB and "paused" on legacy qB,
+// based on the detected API version.
 const qbApiCapabilities = { legacy: false };
 
 function buildLoginBody() {
@@ -128,6 +129,17 @@ export function getQbApiCapabilities() {
   return qbApiCapabilities;
 }
 
+// Ensure the API version has been probed before code that branches on it
+// (e.g. the add-torrent stopped/paused mapping). detectCapabilities is
+// otherwise lazy/fire-and-forget, so on a fresh process a qB4 instance could
+// be treated as modern until the first probe lands. No-op once detected.
+export async function ensureCapabilitiesDetected() {
+  if (!capsDetected) {
+    await detectCapabilities();
+  }
+  return qbApiCapabilities;
+}
+
 export function getQbApiVersion() {
   return qbApiVersion;
 }
@@ -147,9 +159,9 @@ export function confirmLegacyMode() {
 // lazy detection probe doesn't fire on every test request and pollute
 // the axios mock call list with extra /app/webapiVersion hits. Production
 // code must not call this.
-export function __resetCapabilitiesForTests() {
+export function __resetCapabilitiesForTests(detected = true) {
   qbApiCapabilities.legacy = false;
-  capsDetected = true;
+  capsDetected = detected;
   qbApiVersion = null;
   sessionCookie = null;
   loginInFlight = null;
