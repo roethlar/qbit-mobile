@@ -1,0 +1,60 @@
+{
+  "validated_against": {
+    "commit": "de7944f1464e25fafbb51aaaa254c97d7a12dc92",
+    "date": "2026-06-15"
+  },
+  "projects": [
+    {
+      "name": "frontend",
+      "path": "src",
+      "description": "React 19 + TypeScript + Vite 8 + Tailwind PWA. State via TanStack Query. Entry: src/main.tsx; pages in src/pages, components in src/components, hooks in src/hooks, API client in src/services/directApi.ts, types in src/types.",
+      "build": "npm run build",
+      "test": "npm test"
+    },
+    {
+      "name": "server",
+      "path": "server",
+      "description": "Express proxy to the qBittorrent Web API and the app's security boundary. Entry: server/server.js; route handlers in server/routes, qBittorrent client in server/qbClient.js, move-location presets in server/locations.js. Tests in server/__tests__.",
+      "test": "npm test"
+    },
+    {
+      "name": "deploy",
+      "path": ".",
+      "description": "Platform install/uninstall scripts: deploy.sh + uninstall.sh (Linux/systemd), deploy-macos.sh + uninstall-macos.sh (macOS/launchd), deploy.ps1 + uninstall.ps1 (Windows/Scheduled Task). Not covered by automated tests; verify manually."
+    }
+  ],
+  "verification": {
+    "status": "confirmed",
+    "commands": [
+      "npm run lint",
+      "npm run typecheck",
+      "npm test",
+      "npm run build"
+    ],
+    "policy": {
+      "code_changes": "Run current automated verification before claiming completion.",
+      "docs_only": "Code verification is not required unless docs affect setup, commands, runtime behavior, generated files, or user-visible behavior.",
+      "manual_behavior": "Run the relevant manual check, smoke test, or playtest for behavior not covered by automation (live UI against a running qBittorrent, deploy/uninstall scripts), or state clearly that it was not run."
+    }
+  },
+  "fact_bearing_paths": [
+    "package.json",
+    ".github/workflows/ci.yml",
+    "server/server.js",
+    "server/routes/torrents.js",
+    "server/qbClient.js",
+    ".env.example",
+    "README.md"
+  ],
+  "guidance_paths": [
+    "AGENTS.md",
+    ".agents/state.md",
+    ".agents/decisions.md",
+    ".agents/repo-map.json",
+    ".agents/artifact-manifest.json"
+  ],
+  "notes": [
+    "CI (.github/workflows/ci.yml) runs lint, typecheck, test, build, and npm audit --omit=dev --audit-level=high on push and PR to main; confirmed it sits in a provider-executable path with branch triggers matching the current branch.",
+    "docs/code-review.md and docs/static-code-review-2026-05-04.md are dated review snapshots (history), not current state; verify their claims against current code before relying on them."
+  ]
+}

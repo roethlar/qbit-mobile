@@ -1,0 +1,44 @@
+{
+  "validated_against": {
+    "commit": "de7944f1464e25fafbb51aaaa254c97d7a12dc92",
+    "date": "2026-06-15"
+  },
+  "artifacts": [
+    {
+      "path": "AGENTS.md",
+      "purpose": "Canonical agent guidance",
+      "custody": "tracked"
+    },
+    {
+      "path": "CLAUDE.md",
+      "purpose": "Claude Code harness shim that imports AGENTS.md",
+      "custody": "tracked"
+    },
+    {
+      "path": ".agents/state.md",
+      "purpose": "Current repo state, active work, blockers, next actions, and unrecorded repo memory",
+      "custody": "tracked"
+    },
+    {
+      "path": ".agents/decisions.md",
+      "purpose": "Durable decisions and supersessions",
+      "custody": "tracked"
+    },
+    {
+      "path": ".agents/repo-map.json",
+      "purpose": "Structured map of projects, fact-bearing paths, and verification commands",
+      "custody": "tracked"
+    },
+    {
+      "path": ".agents/artifact-manifest.json",
+      "purpose": "This manifest: inventory of governance artifacts and their custody",
+      "custody": "tracked"
+    },
+    {
+      "path": ".claude/settings.local.json",
+      "purpose": "Machine-local Claude Code permission allowlist; gitignored, kept out of version control",
+      "custody": "ignored",
+      "custody_note": "git check-ignore .claude exits 0 (the .gitignore rule '.claude/' covers it)."
+    }
+  ]
+}
