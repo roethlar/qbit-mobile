@@ -1,0 +1,322 @@
+// Mock qBittorrent API data for the screenshot harness.
+//
+// These fixtures stand in for a live qBittorrent backend so the README
+// screenshots are reproducible without a real server, real torrents, or
+// credentials. The capture script (capture.mjs) fulfils the app's /api
+// requests with these payloads. Content names are Linux distributions —
+// representative, legal, and recognisable.
+//
+// Field shapes mirror src/types/qbittorrent.ts. Only the fields the UI
+// actually reads need realistic values; the rest carry sane defaults so the
+// objects are structurally complete.
+
+// Fixed clock so dates render deterministically across runs.
+// 2025-06-01T00:00:00Z and a "now" a few days later.
+const DAY = 86_400;
+const NOW = 1_748_736_000; // 2025-06-01T00:00:00Z
+
+/** Build a structurally complete Torrent, overriding the interesting fields. */
+function torrent(overrides) {
+  return {
+    added_on: NOW - 3 * DAY,
+    amount_left: 0,
+    auto_tmm: false,
+    availability: 1,
+    category: '',
+    completed: 0,
+    completion_on: 0,
+    content_path: '/data/downloads',
+    dl_limit: 0,
+    dlspeed: 0,
+    downloaded: 0,
+    downloaded_session: 0,
+    eta: 8_640_000,
+    f_l_piece_prio: false,
+    force_start: false,
+    hash: '',
+    inactive_seeding_time_limit: -2,
+    infohash_v1: '',
+    infohash_v2: '',
+    last_activity: NOW,
+    magnet_uri: '',
+    max_inactive_seeding_time: -1,
+    max_ratio: -1,
+    max_seeding_time: -1,
+    name: '',
+    num_complete: 0,
+    num_incomplete: 0,
+    num_leechs: 0,
+    num_seeds: 0,
+    priority: 0,
+    progress: 0,
+    ratio: 0,
+    ratio_limit: -2,
+    save_path: '/data/downloads',
+    seeding_time: 0,
+    seeding_time_limit: -2,
+    seen_complete: NOW,
+    seq_dl: false,
+    size: 0,
+    state: 'unknown',
+    super_seeding: false,
+    tags: '',
+    time_active: 3 * DAY,
+    total_size: 0,
+    tracker: 'https://tracker.example.org/announce',
+    trackers_count: 1,
+    up_limit: 0,
+    uploaded: 0,
+    uploaded_session: 0,
+    upspeed: 0,
+    ...overrides,
+  };
+}
+
+const GiB = 1024 ** 3;
+const MiB = 1024 ** 2;
+
+// A populated list spanning the states the UI distinguishes: active downloads,
+// seeding, stalled, paused, queued, and checking — so the filter chips and
+// per-row treatments all have something to show.
+export const populatedTorrents = [
+  torrent({
+    hash: '0a1b2c3d4e5f60718293a4b5c6d7e8f901234567',
+    name: 'ubuntu-24.04.1-desktop-amd64.iso',
+    state: 'downloading',
+    progress: 0.62,
+    size: 5.9 * GiB,
+    total_size: 5.9 * GiB,
+    downloaded: 3.66 * GiB,
+    completed: 3.66 * GiB,
+    uploaded: 0.42 * GiB,
+    amount_left: 2.24 * GiB,
+    dlspeed: 11.2 * MiB,
+    upspeed: 480 * 1024,
+    eta: 205,
+    ratio: 0.11,
+    num_seeds: 48,
+    num_complete: 612,
+    num_leechs: 12,
+    num_incomplete: 73,
+    category: 'linux-isos',
+    tags: 'verified',
+    save_path: '/data/downloads',
+  }),
+  torrent({
+    hash: '11223344556677889900aabbccddeeff00112233',
+    name: 'debian-12.8.0-amd64-netinst.iso',
+    state: 'uploading',
+    progress: 1,
+    size: 0.63 * GiB,
+    total_size: 0.63 * GiB,
+    downloaded: 0.63 * GiB,
+    completed: 0.63 * GiB,
+    uploaded: 2.0 * GiB,
+    dlspeed: 0,
+    upspeed: 1.5 * MiB,
+    eta: 8_640_000,
+    ratio: 3.21,
+    completion_on: NOW - 2 * DAY,
+    seeding_time: 2 * DAY,
+    num_seeds: 0,
+    num_complete: 980,
+    num_leechs: 21,
+    num_incomplete: 144,
+    category: 'linux-isos',
+    tags: 'verified',
+  }),
+  torrent({
+    hash: 'aabbccddeeff00112233445566778899aabbccdd',
+    name: 'Fedora-Workstation-Live-41-1.4.x86_64.iso',
+    state: 'stalledDL',
+    progress: 0.08,
+    size: 2.1 * GiB,
+    total_size: 2.1 * GiB,
+    downloaded: 0.17 * GiB,
+    completed: 0.17 * GiB,
+    amount_left: 1.93 * GiB,
+    dlspeed: 0,
+    upspeed: 0,
+    eta: 8_640_000,
+    ratio: 0,
+    num_seeds: 2,
+    num_complete: 41,
+    num_leechs: 9,
+    num_incomplete: 60,
+    category: 'linux-isos',
+  }),
+  torrent({
+    hash: 'ff00112233445566778899aabbccddeeff001122',
+    name: 'archlinux-2025.06.01-x86_64.iso',
+    state: 'stoppedDL',
+    progress: 0.34,
+    size: 1.2 * GiB,
+    total_size: 1.2 * GiB,
+    downloaded: 0.41 * GiB,
+    completed: 0.41 * GiB,
+    amount_left: 0.79 * GiB,
+    dlspeed: 0,
+    upspeed: 0,
+    ratio: 0.05,
+    num_seeds: 0,
+    num_complete: 120,
+    num_leechs: 0,
+    num_incomplete: 18,
+    category: '',
+  }),
+  torrent({
+    hash: '99887766554433221100ffeeddccbbaa99887766',
+    name: 'linuxmint-22-cinnamon-64bit.iso',
+    state: 'uploading',
+    progress: 1,
+    size: 2.8 * GiB,
+    total_size: 2.8 * GiB,
+    downloaded: 2.8 * GiB,
+    completed: 2.8 * GiB,
+    uploaded: 3.1 * GiB,
+    dlspeed: 0,
+    upspeed: 720 * 1024,
+    eta: 8_640_000,
+    ratio: 1.10,
+    completion_on: NOW - 5 * DAY,
+    seeding_time: 5 * DAY,
+    num_complete: 540,
+    num_incomplete: 88,
+    category: 'linux-isos',
+    tags: 'verified',
+  }),
+  torrent({
+    hash: '0123456789abcdef0123456789abcdef01234567',
+    name: 'nixos-minimal-24.11-x86_64-linux.iso',
+    state: 'queuedDL',
+    progress: 0,
+    size: 1.0 * GiB,
+    total_size: 1.0 * GiB,
+    amount_left: 1.0 * GiB,
+    dlspeed: 0,
+    upspeed: 0,
+    ratio: 0,
+    num_seeds: 5,
+    num_complete: 64,
+    num_leechs: 3,
+    num_incomplete: 22,
+    category: '',
+  }),
+  torrent({
+    hash: 'cafebabecafebabecafebabecafebabecafebabe',
+    name: 'openSUSE-Tumbleweed-DVD-x86_64-Current.iso',
+    state: 'checkingUP',
+    progress: 1,
+    size: 4.7 * GiB,
+    total_size: 4.7 * GiB,
+    downloaded: 4.7 * GiB,
+    completed: 4.7 * GiB,
+    uploaded: 0.9 * GiB,
+    dlspeed: 0,
+    upspeed: 0,
+    ratio: 0.19,
+    completion_on: NOW - 1 * DAY,
+    num_complete: 210,
+    num_incomplete: 34,
+    category: 'linux-isos',
+  }),
+];
+
+// An empty install — the first-run / nothing-added state.
+export const emptyTorrents = [];
+
+export const globalStats = {
+  dl_info_speed: 11.2 * MiB,
+  up_info_speed: 2.7 * MiB,
+  dl_rate_limit: 0,
+  up_rate_limit: 5 * MiB,
+  total_queued_size: 1.0 * GiB,
+  free_space_on_disk: 412 * GiB,
+  connection_status: 'connected',
+  dht_nodes: 348,
+  alltime_dl: 1284 * GiB,
+  alltime_ul: 967 * GiB,
+  total_peer_connections: 142,
+};
+
+// Idle stats for the empty / first-run state — no torrents, no transfer.
+export const emptyStats = {
+  dl_info_speed: 0,
+  up_info_speed: 0,
+  dl_rate_limit: 0,
+  up_rate_limit: 5 * MiB,
+  total_queued_size: 0,
+  free_space_on_disk: 412 * GiB,
+  connection_status: 'connected',
+  dht_nodes: 0,
+  alltime_dl: 0,
+  alltime_ul: 0,
+  total_peer_connections: 0,
+};
+
+export const preferences = {
+  save_path: '/data/downloads',
+  dl_limit: 0,
+  up_limit: 5 * MiB,
+  add_stopped_enabled: false,
+  listen_port: 6881,
+  max_connec: 200,
+  dht: true,
+  pex: true,
+  lsd: true,
+};
+
+// Detail-view payloads, keyed to the first populated torrent (Ubuntu).
+export const torrentProperties = {
+  save_path: '/data/downloads',
+  creation_date: NOW - 30 * DAY,
+  piece_size: 4 * MiB,
+  comment: 'Ubuntu Desktop image. Verify the SHA256 against releases.ubuntu.com.',
+  total_wasted: 12 * MiB,
+  total_uploaded: 0.42 * GiB,
+  total_uploaded_session: 0.18 * GiB,
+  total_downloaded: 3.66 * GiB,
+  total_downloaded_session: 1.4 * GiB,
+  up_limit: 0,
+  dl_limit: 0,
+  time_elapsed: 1820,
+  seeding_time: 0,
+  nb_connections: 34,
+  nb_connections_limit: 200,
+  share_ratio: 0.11,
+  addition_date: NOW - 3 * DAY,
+  completion_date: -1,
+  created_by: 'mktorrent 1.1',
+  dl_speed_avg: 9.4 * MiB,
+  dl_speed: 11.2 * MiB,
+  eta: 205,
+  last_seen: NOW,
+  peers: 12,
+  peers_total: 73,
+  pieces_have: 932,
+  pieces_num: 1510,
+  reannounce: 1620,
+  seeds: 48,
+  seeds_total: 612,
+  total_size: 5.9 * GiB,
+  up_speed_avg: 410 * 1024,
+  up_speed: 480 * 1024,
+};
+
+export const torrentFiles = [
+  { index: 0, name: 'ubuntu-24.04.1-desktop-amd64.iso', size: 5.9 * GiB, progress: 0.62, priority: 1, is_seed: false, piece_range: [0, 1509], availability: 0.62 },
+  { index: 1, name: 'SHA256SUMS', size: 480, progress: 1, priority: 1, is_seed: false, piece_range: [0, 0], availability: 1 },
+  { index: 2, name: 'SHA256SUMS.gpg', size: 833, progress: 1, priority: 7, is_seed: false, piece_range: [0, 0], availability: 1 },
+];
+
+export const torrentTrackers = [
+  { url: 'https://torrent.ubuntu.com/announce', status: 2, tier: 0, num_peers: 73, num_seeds: 612, num_leeches: 73, num_downloaded: 14082, msg: '' },
+  { url: 'https://ipv6.torrent.ubuntu.com/announce', status: 2, tier: 1, num_peers: 12, num_seeds: 88, num_leeches: 12, num_downloaded: 2044, msg: '' },
+  { url: '** [DHT] **', status: 2, tier: -1, num_peers: 31, num_seeds: 0, num_leeches: 0, num_downloaded: 0, msg: '' },
+];
+
+export const locationPresets = [
+  { name: 'Movies', path: '/data/media/movies' },
+  { name: 'TV Shows', path: '/data/media/tv' },
+  { name: 'ISOs', path: '/data/downloads/isos' },
+];

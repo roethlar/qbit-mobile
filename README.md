@@ -12,6 +12,12 @@ A modern, responsive web interface for qBittorrent optimized for mobile devices.
 - Installable PWA with offline shell (the UI loads from cache; live torrent data needs a connection)
 - HTTP Basic auth and an endpoint allowlist so the proxy can't drive the qBittorrent admin API beyond what the UI uses
 
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/hero-tour.png" width="900" alt="qBit Mobile on desktop and mobile in light and dark, with the expanded row, torrent detail, swipe actions, add-torrent and settings screens">
+</p>
+
 ## Requirements
 
 - Node.js 22.12+ (Vite 8 requires `^20.19.0 || >=22.12.0`)
@@ -190,7 +196,14 @@ npm test
 
 # Start production server
 npm start
+
+# Regenerate the README screenshots (headless, mock data)
+npm run screenshots
 ```
+
+The screenshot harness drives the app with a headless browser against mocked
+qBittorrent responses; see [`scripts/screenshots/`](scripts/screenshots/) for
+setup and details.
 
 ## Systemd Service
 

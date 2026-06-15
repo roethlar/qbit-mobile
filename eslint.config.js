@@ -54,4 +54,17 @@ export default [
       globals: { ...globals.node },
     },
   },
+  {
+    // Node tooling scripts (the screenshot harness). Browser globals are
+    // included for the small snippets evaluated inside the page context.
+    files: ['scripts/**/*.{js,mjs}'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: { ...globals.node, ...globals.browser },
+    },
+    rules: {
+      ...js.configs.recommended.rules,
+    },
+  },
 ]

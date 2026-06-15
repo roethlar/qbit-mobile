@@ -37,10 +37,12 @@ vite.config.ts
 *.tmp
 *.temp
 .claude/
-Capture.*
 *.png
 *.jpg
 *.jpeg
+# ...but the curated README gallery is checked in (regenerate with `npm run screenshots`).
+!docs/screenshots/
+!docs/screenshots/*.png
 
 # OS generated files
 Thumbs.db
