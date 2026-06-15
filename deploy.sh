@@ -320,11 +320,11 @@ write_env_file() {
     local qb_user="$8"
     local qb_pass="$9"
 
-    # Create the file with locked-down perms BEFORE writing any secret so the
-    # password is never briefly world-readable under a default umask. The
-    # final chmod later is kept as belt-and-suspenders.
+    # Create the file with owner-only perms BEFORE writing any secret so the
+    # password is never briefly readable by group/world under a default umask.
+    # The final chmod later is kept as belt-and-suspenders.
     : > "${ENV_FILE}"
-    chmod 640 "${ENV_FILE}"
+    chmod 600 "${ENV_FILE}"
 
     # Use printf so $-expansion / backticks in values don't get interpreted,
     # and quote every value so dotenv parses passwords with # or whitespace
@@ -429,8 +429,8 @@ else
         existing_host=$(grep -E '^HOST=' "${ENV_FILE}" | head -n1 | cut -d= -f2- || true)
         prompt_app_auth "${existing_host:-0.0.0.0}"
         # Lock perms before appending secrets in case a hand-created pre-1.1
-        # .env was left world-readable.
-        chmod 640 "${ENV_FILE}"
+        # .env was left readable by group/world.
+        chmod 600 "${ENV_FILE}"
         append_auth_to_env
         print_msg "Added the new auth keys to ${ENV_FILE}."
     fi
@@ -441,12 +441,13 @@ fi
 # the install stays read-only under ProtectSystem=strict.
 mkdir -p "${APP_DIR}/data"
 
-# Set permissions. .env is always 640 so the password isn't world-readable.
+# Set permissions. .env is owner-only (600) so the password isn't readable by
+# group or world, even in the shared-group (nobody/nogroup) service path.
 print_msg "Setting permissions..."
 chown -R "${SERVICE_USER}:${SERVICE_GROUP}" "${APP_DIR}"
 find "${APP_DIR}" -type d -exec chmod 750 {} +
 find "${APP_DIR}" -type f -exec chmod 640 {} +
-chmod 640 "${ENV_FILE}"
+chmod 600 "${ENV_FILE}"
 
 
 print_msg "Creating systemd service..."

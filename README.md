@@ -245,6 +245,6 @@ If you encounter any issues, please report them on the [GitHub issues page](http
 ## Notes on Compatibility and Security
 
 - Dedicated user: The service runs as a dedicated system user `qbitmobile` by default (the deploy script also offers `nobody`), which follows least-privilege best practices and improves compatibility on distributions like Arch.
-- Permissions: The app directory `/opt/qbit-mobile` is owned by the service user with mode `750`, and the `.env` is always `640` so the password is not world-readable.
+- Permissions: The app directory `/opt/qbit-mobile` is owned by the service user with mode `750`, and the `.env` is owner-only (`600`) so the password is not readable by group or world.
 - systemd hardening: the unit file applies `NoNewPrivileges`, `ProtectSystem=strict`, `ProtectHome`, `ProtectKernel*`, `RestrictAddressFamilies=AF_INET AF_INET6`, an empty `CapabilityBoundingSet`, and a `@system-service` syscall filter. Use `systemd-analyze security qbit-mobile` to inspect.
 - App auth on by default: `AUTH_MODE=basic` is the default and the server refuses to boot without credentials. The proxy exposes only an allowlist of qBittorrent endpoints, so even an authenticated caller cannot reach `/app/shutdown` or set RCE-enabling preferences like `autorun_program`.
