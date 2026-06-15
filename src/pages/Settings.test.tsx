@@ -9,9 +9,14 @@ vi.mock('../services/directApi', () => ({
 }));
 
 // The presets card pulls its own TanStack Query hooks; stub it out so this
-// test stays focused on the page's back-navigation guard.
+// test stays focused on the page's back-navigation guard. The stub exposes a
+// button that fires onDirtyChange(true) so the presets-dirty path is testable.
 vi.mock('../components/LocationPresetsCard', () => ({
-  LocationPresetsCard: () => null,
+  LocationPresetsCard: ({ onDirtyChange }: { onDirtyChange?: (dirty: boolean) => void }) => (
+    <button type="button" onClick={() => onDirtyChange?.(true)}>
+      mock-mark-presets-dirty
+    </button>
+  ),
 }));
 
 import { Settings } from './Settings';
@@ -52,5 +57,19 @@ describe('Settings back navigation', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Back' }));
 
     expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens the discard sheet when only the presets card is dirty', async () => {
+    vi.mocked(getPreferences).mockResolvedValue(basePrefs);
+    const onBack = vi.fn();
+    render(<Settings onBack={onBack} />);
+
+    await screen.findByPlaceholderText('/path/to/downloads');
+    // qB prefs untouched; mark the presets card dirty via the stub.
+    await userEvent.click(screen.getByRole('button', { name: 'mock-mark-presets-dirty' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Back' }));
+
+    expect(screen.getByText('Discard unsaved settings?')).toBeTruthy();
+    expect(onBack).not.toHaveBeenCalled();
   });
 });
