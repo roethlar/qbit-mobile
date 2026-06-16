@@ -5,12 +5,13 @@ short and update it when important repo facts change.
 
 ## Now
 
-- No active feature work recorded. The repo is at version 1.1.0 on `main` (clean tree at
-  bootstrap, commit `de7944f`).
+- No active feature work in progress. The repo is at version 1.5.1 on `main`
+  (HEAD `800b131`). The 2026-06-15 code review and its rechecks are resolved and merged.
 
 ## Next
 
-- None recorded.
+- A v1.5.2 patch release carrying the review fixes is drafted but not yet bumped,
+  tagged, or published.
 
 ## Blockers
 
