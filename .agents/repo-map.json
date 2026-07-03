@@ -1,7 +1,7 @@
 {
   "validated_against": {
-    "commit": "800b13136bb582dcdce6333553b3083de99f240b",
-    "date": "2026-06-15"
+    "commit": "283556dade841ad2c12a5ab3bc0d7952d799b06d",
+    "date": "2026-07-03"
   },
   "projects": [
     {
@@ -48,10 +48,12 @@
   ],
   "guidance_paths": [
     "AGENTS.md",
+    ".agents/repo-guidance.md",
     ".agents/state.md",
     ".agents/decisions.md",
     ".agents/repo-map.json",
-    ".agents/artifact-manifest.json"
+    ".agents/artifact-manifest.json",
+    ".agents/push-policy.md"
   ],
   "notes": [
     "CI (.github/workflows/ci.yml) runs lint, typecheck, test, build, and npm audit --omit=dev --audit-level=high on push and PR to main; confirmed it sits in a provider-executable path with branch triggers matching the current branch.",
