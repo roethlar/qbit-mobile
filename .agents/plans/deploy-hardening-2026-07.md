@@ -33,10 +33,18 @@ silently. The `rm -rf` block above it (`App.tsx`, `main.tsx`, `qbClient.js`,
 `manifest.json`, `contexts/`, `routes/`, `services/`, ...) is accumulated scar tissue:
 each entry is a past reorganization that stranded a stale file on a live install.
 
-An allowlist fails closed against *new* files. A denylist (copy everything except
-`node_modules`, `dist`, `.git`, `.env`, `data`, and repo-only directories) fails open,
-which is the correct direction here: a forgotten exclude wastes disk, a forgotten
-include breaks the build.
+~~An allowlist fails closed against *new* files. A denylist ... fails open, which is the
+correct direction here: a forgotten exclude wastes disk, a forgotten include breaks the
+build.~~
+
+**Struck 2026-07-10, this was wrong.** A forgotten exclude does not waste disk — it
+leaks secrets. `.gitignore` ignores `.env.local`, `.env.production` and the `.local`
+variants because they hold credentials; an exclude list covering only `./.env` stages
+them into `${APP_DIR}`, silently. An allowlist fails loudly, at deploy time, before
+anything ships. Loud beats silent when the silent failure publishes credentials.
+
+The defect was "maintained by hand", not "allowlist". The fix is `git ls-files`: an
+allowlist that maintains itself. See `.agents/decisions.md`.
 
 ### 3. No atomicity
 
@@ -84,10 +92,10 @@ destructive root script is worse than a known-brittle one. Recorded as follow-up
 
 1. `e676d08` — `npm ci` fallback deleted in all three scripts, guarded by a test that
    strips comments before matching.
-2. `ac7676a` — `deploy.sh` stages into `${APP_DIR}.stage`, copies by exclusion, swaps
-   atomically, keeps `${APP_DIR}.old.$$` until the service is healthy, and rolls back on
-   a failed start. The exclude set was verified by replicating the exact `tar`
-   invocation into a temp dir and building from the result (`1.6.4+nogit.<ts>`).
+2. `ac7676a` — `deploy.sh` stages into `${APP_DIR}.stage`, swaps atomically, keeps
+   `${APP_DIR}.old.$$` until the service is healthy, and rolls back on a failed start.
+   Its exclude-list copy was **wrong and was replaced in `5e4326d`** by `git ls-files`;
+   the staging/swap machinery from this commit stands.
 3. `9450415` — `deploy.sh` reads `engines.node` from `package.json`, failing closed on an
    unparseable range.
 

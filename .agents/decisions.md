@@ -165,6 +165,40 @@ Distinct from the build id (`build-id.ts`), which exists because a version numbe
 identify an individual build — notably in `deploy.sh`, which builds from a copied tree
 with no `.git`. Version answers "what changed"; build id answers "which build".
 
+### deploy.sh stages the files git tracks; never an exclude list
+
+Status: Active (adopted 2026-07-10, commit `5e4326d`, superseding the exclude list
+briefly introduced in `ac7676a`)
+
+Decision:
+`deploy.sh` builds its staging tree from `git ls-files -z`. It must not filter with
+`tar --exclude=`, and must not carry a hand-written list of files to copy. It refuses to
+run outside a git repository rather than staging blindly.
+
+Reason:
+The two failure modes are not symmetric, and the tempting argument gets this backwards.
+
+- A hand-maintained **allowlist** fails **loudly**: a new file that the build needs is
+  simply missing, and the deploy dies with a resolve error before anything ships. This
+  happened once (`build-id.ts`, fixed in `bde77a7`).
+- An **exclude list** fails **silently**, and what it silently does is publish secrets.
+  `.gitignore` ignores `.env`, `.env.local`, `.env.production` and the `.local` variants
+  because they hold credentials. An exclude list covering only `./.env` stages the rest.
+  Demonstrated during the fix: with those files planted in a working tree, the `ac7676a`
+  `tar` invocation staged a file containing `SECRET=hunter2` into the tree destined for
+  `/opt/qbit-mobile`.
+
+The real defect was never "allowlist" — it was "maintained by hand". `git ls-files` is
+an allowlist that maintains itself.
+
+This is safe **only while secrets stay untracked.** A tracked `.env` would be deployed.
+`test/deploy-manifest.test.ts` asserts no `.env*` is tracked, and that every local import
+of `vite.config.ts` is tracked (an untracked one would not be staged, and the deploy
+could not build).
+
+`git ls-files` rather than `git archive HEAD`: the working tree is deployed, not the last
+commit, preserving the behaviour of the `cp` calls this replaced.
+
 ## Open Decisions (deferred - not yet adopted)
 
 Assessed findings the owner chose to record as a future decision rather than
