@@ -5,27 +5,26 @@ short and update it when important repo facts change.
 
 ## Now
 
-- No active feature work in progress. The repo is at version 1.5.2 on `main`.
-  The v1.5.2 patch release (path-writing validation hardening, `.env` permission
-  tightening, deploy-script guard, and several bug fixes) has shipped.
+- No active work in progress. `main` is at version **1.6.6**, deployed and verified
+  in production 2026-07-10: `sudo ./deploy.sh` ran the atomic staging swap, a real
+  torrent uploaded through the Express 5 proxy against live qBittorrent, and the
+  header showed the deployed build. Local, `origin` (Gitea), and `github` are all in
+  sync at the merge commit `f7da04e`.
+- The 2026-07-10 work, all landed, pushed, and verified: multer 2.2.0; Express 4 → 5;
+  the CI/audit restructure (Node 22+24 matrix, `npm audit` split to a weekly workflow,
+  Dependabot enabled); the UI build-id/version display; the versioning rule; and the
+  deploy.sh hardening (staging swap + rollback, `git ls-files` staging, Node floor read
+  from `engines`). See `.agents/plans/` and `.agents/decisions.md`.
 - Governance was refreshed to the AgentGovernanceBootstrap standard template
-  (2026-07-02.1): `AGENTS.md` is now the portable template verbatim, and
-  repo-specific content moved to `.agents/repo-guidance.md`.
-- 2026-07-10, CI/dependency work, all landed and **unpushed as of `1ceca1c`**:
-  multer 2.2.0; `checkout@v7` / `setup-node@v6`; Node 22+24 CI matrix; `npm audit`
-  moved out of the blocking build into a weekly workflow; Dependabot added;
-  Express 4 → 5. See `.agents/plans/dependency-currency-2026-07.md` and the
-  corresponding entries in `.agents/decisions.md`.
+  (2026-07-02.1); `f7da04e` merged github's divergent refresh with no content change.
 
 ## Next
 
-- Push the 2026-07-10 commits. `origin` (Gitea) needs interactive credentials;
-  `github` is the remote that runs CI and Dependabot.
 - Decide the open question in `.agents/decisions.md`: should a high-severity
   production advisory block a *release*, now that it no longer blocks a merge?
-- Manual check not yet run: a real add-torrent round trip against a live
-  qBittorrent on Express 5. The upgrade was verified against mocked axios and a
-  smoke test of the proxy's own 404/401 paths only.
+- `deploy-macos.sh` and `deploy.ps1` still have the pre-hardening include list,
+  non-atomic copy, and a hardcoded Node floor; `deploy.ps1` syntax is unverified
+  (no `pwsh` on the dev machine). See `.agents/plans/deploy-hardening-2026-07.md`.
 - Deferred with a trigger, not a date: when Node 26 enters LTS (2026-10-28), move
   the CI matrix to 24 + 26 and raise the `engines` floor and the three deploy
   scripts' Node checks in the same change.
