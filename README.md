@@ -11,6 +11,7 @@ A modern, responsive web interface for qBittorrent optimized for mobile devices.
 - Search, sort, tag filtering, and live global stats
 - Installable PWA with offline shell (the UI loads from cache; live torrent data needs a connection)
 - HTTP Basic auth and an endpoint allowlist so the proxy can't drive the qBittorrent admin API beyond what the UI uses
+- Running version shown in the header, with the full build id on hover, so you can tell exactly what's deployed
 
 ## Screenshots
 
@@ -20,8 +21,9 @@ A modern, responsive web interface for qBittorrent optimized for mobile devices.
 
 ## Requirements
 
-- Node.js 22.12+ (Vite 8 requires `^20.19.0 || >=22.12.0`)
-- qBittorrent with Web UI enabled
+- Node.js 22.12 or newer (the floor Vite 8 requires). Node 24 LTS is recommended and CI
+  tests against both 22 and 24.
+- qBittorrent 4.x or 5.x with the Web UI enabled (the proxy auto-detects the API version)
 - qBittorrent configured to allow local authentication bypass (recommended) or with credentials
 
 ## Installation
@@ -38,7 +40,7 @@ cd qbit-mobile
 sudo ./deploy.sh
 ```
 
-Installs to `/opt/qbit-mobile`, runs as a dedicated `qbitmobile` system user under a hardened systemd unit, persists data under `/opt/qbit-mobile/data`.
+Installs to `/opt/qbit-mobile`, runs as a dedicated `qbitmobile` system user under a hardened systemd unit, persists data under `/opt/qbit-mobile/data`. Upgrades are atomic: the new build is staged and swapped into place only after it builds successfully, so a failed deploy leaves the running install untouched and rolls back automatically. Re-running `sudo ./deploy.sh` preserves your `.env` and `data/`.
 
 **macOS** (launchd LaunchAgent, no sudo):
 
@@ -178,6 +180,8 @@ Version 1.1 adds app-level authentication and several `.env` keys. If you're upg
   The server now refuses to boot when `AUTH_MODE=basic` (the default) and the credentials are missing. If your install is on a fully trusted LAN where you'd rather not have auth, set `AUTH_MODE=disabled` instead.
 
 - The proxy now only forwards an allowlist of qBittorrent endpoints. If you're using this app's API directly from a custom client and depended on paths beyond `/torrents/{info,properties,files,trackers,stop,start,delete,add,recheck,reannounce,setLocation}`, `/transfer/info`, and `/app/{preferences,setPreferences,version,webapiVersion}`, open an issue.
+
+- After any upgrade, the app is an installed PWA, so your browser may keep serving the previously cached UI until the service worker updates. If the version in the header still shows the old build, hard-refresh once (or reopen the installed app) to pick up the new bundle. The header version is the reliable signal for what the browser is actually running.
 
 ## Development
 
