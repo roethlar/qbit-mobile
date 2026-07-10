@@ -4,8 +4,9 @@
 # Task that runs at logon (no UAC, no service install). The task action runs a
 # small generated PowerShell wrapper that starts node and captures logs.
 #
-# Run as the regular user (not elevated). The script aborts if Node 22.12+
-# isn't on PATH, or if invoked from outside the qbit-mobile repo root.
+# Run as the regular user (not elevated). The script aborts if the Node on
+# PATH is older than package.json engines.node, or if invoked from outside
+# the qbit-mobile repo root.
 
 #Requires -Version 7.0
 
@@ -42,7 +43,7 @@ Write-Msg "Checking prerequisites..."
 
 $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
 if (-not $nodeCmd) {
-    Write-Err "Node.js is not installed or not on PATH. Install Node.js 22.12+ (e.g., 'winget install OpenJS.NodeJS.LTS')."
+    Write-Err "Node.js is not installed or not on PATH. Install Node.js first (see package.json engines; e.g., 'winget install OpenJS.NodeJS.LTS')."
     exit 1
 }
 $NodeBin = $nodeCmd.Source
@@ -56,24 +57,15 @@ if (-not $PwshBin -or -not (Test-Path $PwshBin)) {
     $PwshBin = $pwshCmd.Source
 }
 
-$nodeVer = (& $NodeBin -v).TrimStart('v')
-$verParts = $nodeVer.Split('.')
-$nodeMajor = [int]$verParts[0]
-$nodeMinor = [int]$verParts[1]
-if ($nodeMajor -lt 22 -or ($nodeMajor -eq 22 -and $nodeMinor -lt 12)) {
-    Write-Err "Node.js 22.12+ is required. Current version: v$nodeVer"
-    exit 1
-}
-
 $npmCmd = Get-Command npm -ErrorAction SilentlyContinue
 if (-not $npmCmd) {
     Write-Err "npm is not installed. Please install npm first."
     exit 1
 }
 
-# Refuse to run anywhere but the repo root. The copy step below deletes the
-# installed server/src/public first; from the wrong CWD that would wipe the
-# live install and then fail on the copy.
+# Refuse to run anywhere but the repo root: the staging copy below stages the
+# current directory's tracked files, so from the wrong CWD it would stage the
+# wrong tree.
 foreach ($required in @('server','src','public','package.json')) {
     if (-not (Test-Path $required)) {
         Write-Err "Run this script from the qbit-mobile repo root (missing .\$required)."
@@ -81,46 +73,98 @@ foreach ($required in @('server','src','public','package.json')) {
     }
 }
 
-Write-Msg "Creating application directory at $AppDir..."
-New-Item -ItemType Directory -Path $AppDir -Force | Out-Null
-New-Item -ItemType Directory -Path $LogDir -Force | Out-Null
+# The supported Node floor is declared once, in package.json `engines.node`, and
+# read from there. It used to be restated as a literal `22.12` here, which is how
+# this script drifted from the floor that matters. Enforce the minor too: a bare
+# major check lets 22.0..22.11 through, and the build then fails deep inside vite.
+$enginesNode = [string](& $NodeBin -p "require('./package.json').engines.node" 2>$null)
+$floorMatch = [regex]::Match($enginesNode, '^>=(\d+)\.(\d+)')
+if (-not $floorMatch.Success) {
+    Write-Err "Could not read a '>=X.Y' floor from package.json engines.node (got: '$enginesNode')."
+    exit 1
+}
+$floorMajor = [int]$floorMatch.Groups[1].Value
+$floorMinor = [int]$floorMatch.Groups[2].Value
 
-Write-Msg "Copying application files..."
-
-# Wipe directories that may contain files removed since the last release.
-# .env, node_modules, and dist are intentionally preserved.
-foreach ($d in @('server','src','public')) {
-    $target = Join-Path $AppDir $d
-    if (Test-Path $target) { Remove-Item -Path $target -Recurse -Force }
+$nodeVer = (& $NodeBin -v).TrimStart('v')
+$verParts = $nodeVer.Split('.')
+$nodeMajor = [int]$verParts[0]
+$nodeMinor = [int]$verParts[1]
+if ($nodeMajor -lt $floorMajor -or ($nodeMajor -eq $floorMajor -and $nodeMinor -lt $floorMinor)) {
+    Write-Err "Node.js $floorMajor.$floorMinor+ is required. Current version: v$nodeVer"
+    exit 1
 }
 
-Copy-Item -Path .\server -Destination $AppDir -Recurse -Force
-Copy-Item -Path .\src    -Destination $AppDir -Recurse -Force
-Copy-Item -Path .\public -Destination $AppDir -Recurse -Force
-# build-id.ts is imported by vite.config.ts at build time; without it the build
-# fails to load its own config.
-$flatFiles = @('package.json','package-lock.json','.env.example','index.html',
-               'vite.config.ts','build-id.ts','tsconfig.json','tsconfig.node.json',
-               'tailwind.config.js','postcss.config.js','eslint.config.js')
-foreach ($f in $flatFiles) {
-    Copy-Item -Path $f -Destination $AppDir -Force
+$RepoRoot = (Get-Location).Path
+
+# Everything is built in a staging directory and swapped into place only once
+# the build has succeeded. Previously the script deleted the installed source,
+# copied, then built — so a failed build (or a failed npm ci) left a
+# half-updated install: new server code, new node_modules, old dist, old
+# process still running.
+$StageDir = "$AppDir.stage"
+$PrevDir  = $null
+
+# Stage exactly the files git tracks — see deploy.sh for the full rationale: a
+# hand-maintained copy list drifts silently (adding build-id.ts at the repo
+# root broke the deploy), and an exclude list fails open, staging the ignored
+# .env.local/.env.production secrets. `git ls-files` is an allowlist that
+# maintains itself; everything unwanted (.git, node_modules, dist, data, every
+# .env*) falls out for free because none of it is tracked.
+#
+# Unlike deploy.sh this does not pipe through tar: Windows 10/11 ship bsdtar
+# but it is not guaranteed, so each tracked path is copied individually.
+# git ls-files output is newline-delimited; filenames containing newlines
+# cannot occur on Windows. Files are read from the working tree, not from
+# HEAD, preserving the previous behaviour of deploying what is checked out.
+& git -C $RepoRoot rev-parse --git-dir *> $null
+if ($LASTEXITCODE -ne 0) {
+    Write-Err "Not a git repository. deploy.ps1 stages the files git tracks; run it from a clone, not from an extracted archive."
+    exit 1
 }
 
-Push-Location $AppDir
 try {
-    Write-Msg "Installing dependencies..."
-    # No fallback to `npm install` -- see deploy.sh for why: it would resolve
-    # fresh versions from the registry and deploy a tree nothing tested.
-    & npm ci
-    if ($LASTEXITCODE -ne 0) { throw "npm ci failed (lockfile out of sync?)" }
+    Write-Msg "Staging application files..."
+    if (Test-Path $StageDir) { Remove-Item -Path $StageDir -Recurse -Force }
+    New-Item -ItemType Directory -Path $StageDir -Force | Out-Null
+    # AppDir is created for the .env step below; the swap replaces it wholesale.
+    New-Item -ItemType Directory -Path $AppDir -Force | Out-Null
 
-    Write-Msg "Building frontend..."
-    & npm run build
-    if ($LASTEXITCODE -ne 0) { throw "Frontend build failed" }
+    $trackedFiles = & git -C $RepoRoot ls-files
+    if ($LASTEXITCODE -ne 0) {
+        Write-Err "git ls-files failed."
+        exit 1
+    }
+    foreach ($rel in $trackedFiles) {
+        if ([string]::IsNullOrWhiteSpace($rel)) { continue }
+        $src  = Join-Path $RepoRoot $rel
+        $dest = Join-Path $StageDir $rel
+        $destParent = Split-Path -Parent $dest
+        if (-not (Test-Path -LiteralPath $destParent)) {
+            New-Item -ItemType Directory -Path $destParent -Force | Out-Null
+        }
+        Copy-Item -LiteralPath $src -Destination $dest -Force
+    }
+    Write-Msg "Staged application files"
 
-    Write-Msg "Pruning dev dependencies..."
-    & npm prune --omit=dev
-    if ($LASTEXITCODE -ne 0) { throw "npm prune failed" }
+    Push-Location $StageDir
+    try {
+        Write-Msg "Installing dependencies..."
+        # No fallback to `npm install` -- see deploy.sh for why: it would resolve
+        # fresh versions from the registry and deploy a tree nothing tested.
+        & npm ci
+        if ($LASTEXITCODE -ne 0) { throw "npm ci failed (lockfile out of sync?)" }
+
+        Write-Msg "Building frontend..."
+        & npm run build
+        if ($LASTEXITCODE -ne 0) { throw "Frontend build failed" }
+
+        Write-Msg "Pruning dev dependencies..."
+        & npm prune --omit=dev
+        if ($LASTEXITCODE -ne 0) { throw "npm prune failed" }
+    } finally {
+        Pop-Location
+    }
 
     # --- .env handling --------------------------------------------------
 
@@ -333,9 +377,60 @@ try {
         }
     }
 
+    # --- Atomic swap ------------------------------------------------------
+    #
+    # Everything above this point has left the live install untouched: the
+    # build happened in $StageDir. Now stop the task, carry live state across,
+    # and move the staged tree into place. A failure before this line leaves
+    # the previous install running and intact.
+    #
+    # The task is stopped *before* the state is copied. DATA_DIR defaults to
+    # $AppDir\data (server/locations.js), so a write landing between the copy
+    # and the swap would otherwise be silently lost.
+    if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
+        Write-Msg "Stopping task '$TaskName' for the swap..."
+        Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+    }
+    # Stopping the task normally kills its whole process tree, but a stuck
+    # instance can leave a child node.exe holding locks that would fail the
+    # swap (mirrors uninstall.ps1).
+    $oldRunner = Join-Path $AppDir 'run-qbit-mobile.ps1'
+    $leftovers = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+        Where-Object {
+            $_.CommandLine -and
+            ($_.Name -in @('node.exe', 'pwsh.exe', 'powershell.exe')) -and
+            $_.CommandLine -like "*$AppDir*" -and
+            ($_.CommandLine -like '*server.js*' -or $_.CommandLine -like "*$oldRunner*")
+        }
+    foreach ($p in $leftovers) {
+        Write-Msg "Terminating leftover $($p.Name) (pid $($p.ProcessId))..."
+        Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue
+    }
+
+    Write-Msg "Swapping the new build into $AppDir..."
+    if (Test-Path $EnvFile) {
+        Copy-Item -LiteralPath $EnvFile -Destination (Join-Path $StageDir '.env') -Force
+    }
+    if (Test-Path (Join-Path $AppDir 'data')) {
+        Copy-Item -LiteralPath (Join-Path $AppDir 'data') -Destination (Join-Path $StageDir 'data') -Recurse -Force
+    }
+
+    $PrevDir = "$AppDir.old.$PID"
+    Move-Item -LiteralPath $AppDir -Destination $PrevDir
+    try {
+        Move-Item -LiteralPath $StageDir -Destination $AppDir
+    } catch {
+        Write-Err "Swap failed. Restoring the previous install."
+        Move-Item -LiteralPath $PrevDir -Destination $AppDir
+        exit 1
+    }
+
     New-Item -ItemType Directory -Path (Join-Path $AppDir 'data') -Force | Out-Null
+    New-Item -ItemType Directory -Path $LogDir -Force | Out-Null
 
     # Tighten ACL on .env so non-admin local users can't read the password.
+    # Runs after the swap so it applies to the .env that was carried into the
+    # live tree, not one about to be replaced.
     try {
         $acl = Get-Acl $EnvFile
         $acl.SetAccessRuleProtection($true, $false)
@@ -417,6 +512,11 @@ exit $exitCode
     $taskInfo = Get-ScheduledTask -TaskName $TaskName | Get-ScheduledTaskInfo
     if ($taskInfo.LastTaskResult -eq 0 -or $taskInfo.LastTaskResult -eq 267009) {
         # 0 = success, 267009 = task is currently running (SCHED_S_TASK_RUNNING)
+        # The new build is live and healthy. Only now is the previous tree
+        # expendable.
+        if ($PrevDir -and (Test-Path $PrevDir)) {
+            Remove-Item -Path $PrevDir -Recurse -Force
+        }
         Write-Msg "Service started successfully!"
     } else {
         Write-Err "Scheduled task did not start cleanly. LastTaskResult=$($taskInfo.LastTaskResult)"
@@ -424,6 +524,26 @@ exit $exitCode
             Write-Host ""
             Write-Host "Recent log lines:"
             Get-Content $LogFile -Tail 25 -ErrorAction SilentlyContinue
+        }
+
+        # The new build does not run. Put the previous install back, so a
+        # failed deploy leaves a working service rather than a broken one.
+        if ($PrevDir -and (Test-Path $PrevDir)) {
+            Write-Warn "Rolling back to the previous install..."
+            Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+            Remove-Item -Path $AppDir -Recurse -Force
+            Move-Item -LiteralPath $PrevDir -Destination $AppDir
+            # The registered task action points at the runner script inside
+            # $AppDir; the restored tree carries the previous deploy's runner,
+            # so restarting the task is enough.
+            Start-ScheduledTask -TaskName $TaskName
+            Start-Sleep -Seconds 2
+            $taskInfo = Get-ScheduledTask -TaskName $TaskName | Get-ScheduledTaskInfo
+            if ($taskInfo.LastTaskResult -eq 0 -or $taskInfo.LastTaskResult -eq 267009) {
+                Write-Msg "Rolled back; the previous version is running again."
+            } else {
+                Write-Err "Rollback restored $AppDir but the task still will not start."
+            }
         }
         exit 1
     }
@@ -475,5 +595,10 @@ exit $exitCode
     Write-Msg "  http://${lanIp}:${envPort}"
     Write-Msg "========================================="
 } finally {
-    Pop-Location
+    # Mirrors deploy.sh's EXIT trap: a failure anywhere above must not leave
+    # the staging tree behind. After a successful swap $StageDir no longer
+    # exists and this is a no-op.
+    if (Test-Path $StageDir) {
+        Remove-Item -Path $StageDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
 }

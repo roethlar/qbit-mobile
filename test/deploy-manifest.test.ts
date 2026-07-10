@@ -4,17 +4,19 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
 
-// deploy.ps1 still copies a hand-maintained list of root-level files into the
-// install directory and builds there. Nothing ties that list to what
+// The deploy scripts used to copy a hand-maintained list of root-level files
+// into the install directory and build there. Nothing tied that list to what
 // vite.config.ts actually imports, so adding build-id.ts at the repo root broke
 // `sudo ./deploy.sh` with "Could not resolve './build-id'" -- after lint,
 // typecheck, tests and a local build had all passed, because the repo checkout
 // has every file present.
 //
-// deploy.sh and deploy-macos.sh have since been rewritten to stage the files
-// git tracks, so they have no manifest to drift. They are checked differently:
-// that the file list comes from git, that no exclude list filters it, and that
-// a staged tree is swapped into place instead of mutating the live install.
+// All three now stage the files git tracks, so there is no manifest to drift.
+// They are checked structurally instead: the file list comes from git, no
+// exclude list filters it, and a staged tree is swapped into place rather than
+// mutating the live install. The shell scripts stage via a tar pipe; deploy.ps1
+// copies each tracked path individually (tar is not guaranteed on Windows), so
+// its assertions differ slightly.
 
 const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (f: string) => readFileSync(path.join(repoRoot, f), 'utf8');
@@ -39,9 +41,8 @@ function localImportsOfViteConfig(): string[] {
   return matches.map((m) => (m.endsWith('.ts') ? m : `${m}.ts`));
 }
 
-const MANIFEST_SCRIPTS = ['deploy.ps1'];
 const GIT_STAGED_SCRIPTS = ['deploy.sh', 'deploy-macos.sh'];
-const ALL_SCRIPTS = [...GIT_STAGED_SCRIPTS, ...MANIFEST_SCRIPTS];
+const ALL_SCRIPTS = [...GIT_STAGED_SCRIPTS, 'deploy.ps1'];
 
 describe('vite.config.ts local imports are known', () => {
   it('finds at least one', () => {
@@ -51,16 +52,33 @@ describe('vite.config.ts local imports are known', () => {
   });
 });
 
-describe('manifest-style deploy scripts copy everything vite.config.ts needs', () => {
-  it.each(MANIFEST_SCRIPTS)('%s copies each local import of vite.config.ts', (script) => {
-    const code = stripComments(read(script));
-    for (const file of localImportsOfViteConfig()) {
-      expect(code, `${script} does not copy ${file}`).toContain(file);
-    }
+// deploy.ps1 stages by copying each `git ls-files` path individually rather
+// than piping through tar: Windows 10/11 usually ship bsdtar, but it is not
+// guaranteed. Newline-delimited output is safe there because filenames with
+// newlines cannot occur on Windows.
+describe('deploy.ps1 stages the files git tracks', () => {
+  const code = stripComments(read('deploy.ps1'));
+
+  it('derives the file list from git, not from a hand-written manifest', () => {
+    expect(code).toMatch(/git .*ls-files/);
+    // Tripwires against reintroducing a per-file copy list.
+    expect(code).not.toMatch(/Copy-Item -Path \.\\server/);
+    expect(code).not.toContain("'vite.config.ts'");
   });
 
-  it.each(MANIFEST_SCRIPTS)('%s copies vite.config.ts itself', (script) => {
-    expect(stripComments(read(script))).toContain('vite.config.ts');
+  it('refuses to run outside a git repository rather than staging blindly', () => {
+    expect(code).toMatch(/rev-parse --git-dir/);
+  });
+
+  it('swaps a staged tree into place instead of mutating the live install', () => {
+    expect(code).toMatch(/\$StageDir\s*=/);
+    // The old fossil wipe -- proof the destructive pre-copy delete is gone.
+    expect(code).not.toMatch(/Remove-Item -Path \$target -Recurse -Force/);
+  });
+
+  it('reads the Node floor from package.json instead of hardcoding it', () => {
+    expect(code).toContain('engines.node');
+    expect(code, 'deploy.ps1 hardcodes a Node major').not.toMatch(/-lt\s+2[0-9]\b/);
   });
 });
 

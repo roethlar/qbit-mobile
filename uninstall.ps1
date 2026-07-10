@@ -51,6 +51,14 @@ if (Test-Path $AppDir) {
     Remove-Item -Path $AppDir -Recurse -Force
 }
 
+# A deploy interrupted between its cleanup points (kill, power loss) can leave
+# the staging tree or a not-yet-deleted previous install behind; sweep those too.
+if (Test-Path "$AppDir.stage") {
+    Remove-Item -Path "$AppDir.stage" -Recurse -Force
+}
+Get-Item -Path "$AppDir.old.*" -ErrorAction SilentlyContinue |
+    Remove-Item -Recurse -Force
+
 Write-Msg ""
 Write-Msg "========================================="
 Write-Msg "qBit Mobile has been completely removed!"
