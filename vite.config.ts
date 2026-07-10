@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
-import { resolveBuildId } from './build-id'
+import { resolveBuildId, resolveVersion } from './build-id'
 
 // NOTE: `npm run dev` proxies /api straight to qBittorrent and does NOT
 // route through the Express server. That means in dev there is no app-level
@@ -23,6 +23,7 @@ if (!devIsLoopback && process.env.VITE_I_KNOW_THIS_IS_UNSAFE !== '1') {
 
 export default defineConfig({
   define: {
+    __APP_VERSION__: JSON.stringify(resolveVersion()),
     __BUILD_ID__: JSON.stringify(resolveBuildId()),
   },
   plugins: [

@@ -1,6 +1,6 @@
 {
   "name": "qbit-mobile",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "description": "Mobile-friendly qBittorrent Web UI",
   "type": "module",
   "scripts": {

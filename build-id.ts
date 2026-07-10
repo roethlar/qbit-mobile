@@ -1,24 +1,34 @@
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
+function readVersion(): string {
+  const pkgUrl = new URL('./package.json', import.meta.url);
+  return (JSON.parse(readFileSync(pkgUrl, 'utf8')) as { version: string }).version;
+}
+
 /**
- * Identifies the running build in the UI.
+ * The version shown in the UI header. Under the repo's versioning rule
+ * (.agents/repo-guidance.md) every shipped-code commit bumps this, so it alone
+ * distinguishes one released build from the next.
+ */
+export function resolveVersion(): string {
+  return readVersion();
+}
+
+/**
+ * The full build fingerprint, exposed only as a tooltip / debugging aid -- never
+ * as the visible version. It answers "which exact build is this?" when the
+ * version cannot: a rebuild of the same commit, or a working tree with
+ * uncommitted changes.
  *
- * `package.json` version alone is not enough: it stays put across many commits
- * (it sat at 1.5.2 for the whole 2026-07-10 dependency sweep), so it cannot
- * answer "is the thing I just deployed actually running?".
+ * Format: `<version>+<ref>.<YYMMDDHHmm>`, e.g. `1.6.0+e483543.2607101030`.
  *
- * Format: `<version>+<ref>.<YYMMDDHHmm>`, e.g. `1.5.2+e483543.2607101030`.
- *
- * The trailing timestamp is what makes each build distinct. It is load-bearing,
- * not decoration: deploy.sh copies the source tree to /opt/qbit-mobile *without*
- * .git and builds there, so no commit SHA is available at that point and `ref`
- * degrades to `nogit`. Without the timestamp every deployed build would be
- * labelled identically -- exactly the problem this is meant to solve.
+ * `ref` degrades to `nogit` under deploy.sh, which copies the source tree to
+ * /opt/qbit-mobile without .git and builds there. The trailing timestamp is what
+ * keeps such builds distinguishable from one another.
  */
 export function resolveBuildId(): string {
-  const pkgUrl = new URL('./package.json', import.meta.url);
-  const { version } = JSON.parse(readFileSync(pkgUrl, 'utf8')) as { version: string };
+  const version = readVersion();
 
   // YYMMDDHHmm, UTC. Not human-friendly, but it is short and it sorts.
   const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(2, 12);

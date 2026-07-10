@@ -26,9 +26,10 @@ export default defineConfig({
         // embeds a build timestamp and would make assertions non-deterministic.
         // `define` must sit on the project, not the root config -- projects do
         // not inherit it.
-        // Deliberately not a real version: this value is a fixture, not a
-        // mirror of package.json, and must not need editing on a version bump.
+        // Deliberately not real values: these are fixtures, not mirrors of
+        // package.json, and must not need editing on a version bump.
         define: {
+          __APP_VERSION__: JSON.stringify('0.0.0-test'),
           __BUILD_ID__: JSON.stringify('0.0.0-test+testbuild.2601010000'),
         },
         test: {

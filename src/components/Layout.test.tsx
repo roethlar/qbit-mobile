@@ -8,11 +8,30 @@ describe('Header', () => {
     expect(screen.getByRole('heading', { name: 'qBit Mobile' })).toBeTruthy();
   });
 
-  it('renders the build id next to the title', () => {
-    render(<Header title="qBit Mobile" titleSuffix={<span>v{__BUILD_ID__}</span>} />);
-    // The pinned fixture from vitest.config.ts. The real one carries a build
-    // timestamp, which is what makes each build distinguishable in the UI.
-    expect(screen.getByText('v0.0.0-test+testbuild.2601010000')).toBeTruthy();
+  it('renders the version next to the title, with the build id only as a tooltip', () => {
+    render(
+      <Header
+        title="qBit Mobile"
+        titleSuffix={<span title={`Build ${__BUILD_ID__}`}>v{__APP_VERSION__}</span>}
+      />,
+    );
+    // Pinned fixtures from vitest.config.ts.
+    const el = screen.getByText('v0.0.0-test');
+    expect(el).toBeTruthy();
+    expect(el.getAttribute('title')).toBe('Build 0.0.0-test+testbuild.2601010000');
+  });
+
+  // The visible version must stay clean. The raw fingerprint carries a commit
+  // SHA, a build timestamp, and a `-dirty` marker -- none of which belong in a
+  // user-facing header.
+  it('does not display the raw build id', () => {
+    render(
+      <Header
+        title="qBit Mobile"
+        titleSuffix={<span title={`Build ${__BUILD_ID__}`}>v{__APP_VERSION__}</span>}
+      />,
+    );
+    expect(screen.queryByText(/testbuild|\d{10}|-dirty/)).toBeNull();
   });
 
   it('omits the suffix when none is passed', () => {
