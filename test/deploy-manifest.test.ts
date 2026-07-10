@@ -4,16 +4,17 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
 
-// deploy-macos.sh and deploy.ps1 copy a hand-maintained list of root-level files
-// into the install directory and build there. Nothing tied that list to what
+// deploy.ps1 still copies a hand-maintained list of root-level files into the
+// install directory and builds there. Nothing ties that list to what
 // vite.config.ts actually imports, so adding build-id.ts at the repo root broke
 // `sudo ./deploy.sh` with "Could not resolve './build-id'" -- after lint,
 // typecheck, tests and a local build had all passed, because the repo checkout
 // has every file present.
 //
-// deploy.sh has since been rewritten to copy everything except an exclude list,
-// so it has no manifest to drift. It is checked differently: that it still copies
-// by default, and that no exclude swallows a file the build needs.
+// deploy.sh and deploy-macos.sh have since been rewritten to stage the files
+// git tracks, so they have no manifest to drift. They are checked differently:
+// that the file list comes from git, that no exclude list filters it, and that
+// a staged tree is swapped into place instead of mutating the live install.
 
 const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (f: string) => readFileSync(path.join(repoRoot, f), 'utf8');
@@ -38,8 +39,9 @@ function localImportsOfViteConfig(): string[] {
   return matches.map((m) => (m.endsWith('.ts') ? m : `${m}.ts`));
 }
 
-const MANIFEST_SCRIPTS = ['deploy-macos.sh', 'deploy.ps1'];
-const ALL_SCRIPTS = ['deploy.sh', ...MANIFEST_SCRIPTS];
+const MANIFEST_SCRIPTS = ['deploy.ps1'];
+const GIT_STAGED_SCRIPTS = ['deploy.sh', 'deploy-macos.sh'];
+const ALL_SCRIPTS = [...GIT_STAGED_SCRIPTS, ...MANIFEST_SCRIPTS];
 
 describe('vite.config.ts local imports are known', () => {
   it('finds at least one', () => {
@@ -62,8 +64,8 @@ describe('manifest-style deploy scripts copy everything vite.config.ts needs', (
   });
 });
 
-describe('deploy.sh stages the files git tracks', () => {
-  const code = stripComments(read('deploy.sh'));
+describe.each(GIT_STAGED_SCRIPTS)('%s stages the files git tracks', (script) => {
+  const code = stripComments(read(script));
 
   it('derives the file list from git, not from a hand-written manifest', () => {
     expect(code).toMatch(/git .*ls-files/);
@@ -77,7 +79,7 @@ describe('deploy.sh stages the files git tracks', () => {
   // briefly shipped in ac7676a staged a planted .env.local containing a secret.
   // A forgotten include only breaks the deploy, loudly, before anything ships.
   it('does not filter with a tar exclude list', () => {
-    expect(code, 'deploy.sh must not stage via an exclude list').not.toMatch(/--exclude=/);
+    expect(code, `${script} must not stage via an exclude list`).not.toMatch(/--exclude=/);
   });
 
   it('refuses to run outside a git repository rather than staging blindly', () => {
@@ -123,17 +125,19 @@ describe('secrets stay untracked, which is what makes git ls-files safe', () => 
 // The supported Node floor is declared once, in package.json `engines.node`.
 // deploy.sh, deploy-macos.sh and deploy.ps1 each used to restate it as a literal
 // "22.12", which is how three copies drifted from the one that matters.
-describe('deploy.sh reads the Node floor from package.json', () => {
+describe.each(GIT_STAGED_SCRIPTS)('%s reads the Node floor from package.json', (script) => {
+  it('does not hardcode a version floor', () => {
+    const code = stripComments(read(script));
+    expect(code).toContain("engines.node");
+    expect(code, `${script} hardcodes a Node major`).not.toMatch(/-lt\s+2[0-9]\b/);
+  });
+});
+
+describe('engines.node stays in the form the deploy scripts can parse', () => {
   const enginesNode = (JSON.parse(read('package.json')) as { engines: { node: string } }).engines.node;
 
-  it('does not hardcode a version floor', () => {
-    const code = stripComments(read('deploy.sh'));
-    expect(code).toContain("engines.node");
-    expect(code, 'deploy.sh hardcodes a Node major').not.toMatch(/-lt\s+2[0-9]\b/);
-  });
-
-  it('engines.node stays in the >=X.Y.Z form the script can parse', () => {
-    // deploy.sh aborts rather than guessing when this does not match. Changing
+  it('engines.node stays in the >=X.Y.Z form', () => {
+    // The scripts abort rather than guess when this does not match. Changing
     // engines.node to e.g. "^20.19.0 || >=22.12.0" would break every deploy, so
     // fail here instead -- in CI, where it is cheap.
     const floor = /^>=(\d+)\.(\d+)/.exec(enginesNode);

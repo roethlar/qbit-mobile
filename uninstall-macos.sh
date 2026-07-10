@@ -48,6 +48,15 @@ if [ -d "${APP_DIR}" ]; then
     rm -rf "${APP_DIR}"
 fi
 
+# A deploy interrupted between its cleanup points (kill, power loss) can leave
+# the staging tree or a not-yet-deleted previous install behind; sweep those too.
+rm -rf "${APP_DIR}.stage"
+for old in "${APP_DIR}".old.*; do
+    if [ -e "${old}" ]; then
+        rm -rf "${old}"
+    fi
+done
+
 if [ -f "${LOG_FILE}" ]; then
     read -r -p "Remove log file at ${LOG_FILE}? (y/N): " RM_LOG || true
     if [[ "${RM_LOG:-}" =~ ^[Yy]$ ]]; then

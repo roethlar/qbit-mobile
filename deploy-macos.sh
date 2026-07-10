@@ -40,7 +40,7 @@ print_msg "Checking prerequisites..."
 
 NODE_BIN=$(command -v node || true)
 if [ -z "${NODE_BIN}" ]; then
-    print_error "Node.js is not installed. Install Node.js 22.12+ (e.g., via Homebrew: 'brew install node@22')."
+    print_error "Node.js is not installed. Install Node.js first (see package.json engines; e.g. via Homebrew)."
     exit 1
 fi
 # Keep Homebrew's stable /opt/homebrew/bin/node or /usr/local/bin/node symlink
@@ -52,22 +52,13 @@ case "${NODE_BIN}" in
     *) NODE_BIN="$(cd "$(dirname "${NODE_BIN}")" && pwd -P)/$(basename "${NODE_BIN}")" ;;
 esac
 
-NODE_VER_STR=$("${NODE_BIN}" -v | sed 's/^v//')
-NODE_MAJOR=$(echo "$NODE_VER_STR" | cut -d. -f1)
-NODE_MINOR=$(echo "$NODE_VER_STR" | cut -d. -f2)
-if [ "$NODE_MAJOR" -lt 22 ] || { [ "$NODE_MAJOR" -eq 22 ] && [ "$NODE_MINOR" -lt 12 ]; }; then
-    print_error "Node.js 22.12+ is required. Current version: v${NODE_VER_STR}"
-    exit 1
-fi
-
 if ! command -v npm >/dev/null 2>&1; then
     print_error "npm is not installed. Please install npm first."
     exit 1
 fi
 
-# Refuse to run anywhere but the repo root. The copy step below deletes the
-# installed server/src/public first; from the wrong CWD that would wipe the
-# live install and then fail on the copy.
+# Refuse to run anywhere but the repo root: the staging copy below archives the
+# current directory, so from the wrong CWD it would stage the wrong tree.
 for required in server src public package.json; do
     if [ ! -e "${required}" ]; then
         print_error "Run this script from the qbit-mobile repo root (missing ./${required})."
@@ -75,26 +66,69 @@ for required in server src public package.json; do
     fi
 done
 
-print_msg "Creating application directory at ${APP_DIR}..."
-mkdir -p "${APP_DIR}"
-mkdir -p "${LOG_DIR}"
+# The supported Node floor is declared once, in package.json `engines.node`, and
+# read from there. It used to be restated as a literal `22.12` here, which is how
+# this script drifted from the floor that matters. Enforce the minor too: a bare
+# major check lets 22.0..22.11 through, and the build then fails deep inside vite.
+ENGINES_NODE=$("${NODE_BIN}" -p "require('./package.json').engines.node" 2>/dev/null || true)
+NODE_FLOOR=$(printf '%s' "${ENGINES_NODE}" | sed -n 's/^>=\([0-9][0-9]*\.[0-9][0-9]*\).*/\1/p')
+if [ -z "${NODE_FLOOR}" ]; then
+    print_error "Could not read a '>=X.Y' floor from package.json engines.node (got: '${ENGINES_NODE}')."
+    exit 1
+fi
+FLOOR_MAJOR=${NODE_FLOOR%%.*}
+FLOOR_MINOR=${NODE_FLOOR##*.}
 
-print_msg "Copying application files..."
+NODE_VER_STR=$("${NODE_BIN}" -v | sed 's/^v//')
+NODE_MAJOR=$(echo "$NODE_VER_STR" | cut -d. -f1)
+NODE_MINOR=$(echo "$NODE_VER_STR" | cut -d. -f2)
+if [ "$NODE_MAJOR" -lt "$FLOOR_MAJOR" ] \
+   || { [ "$NODE_MAJOR" -eq "$FLOOR_MAJOR" ] && [ "$NODE_MINOR" -lt "$FLOOR_MINOR" ]; }; then
+    print_error "Node.js ${NODE_FLOOR}+ is required. Current version: v${NODE_VER_STR}"
+    exit 1
+fi
 
-# Wipe directories that may contain files removed since the last release.
-# .env, node_modules, and dist are intentionally preserved.
-rm -rf "${APP_DIR}/server" "${APP_DIR}/src" "${APP_DIR}/public"
+REPO_ROOT="$(pwd)"
 
-cp -R server  "${APP_DIR}/"
-cp -R src     "${APP_DIR}/"
-cp -R public  "${APP_DIR}/"
-cp package.json package-lock.json .env.example "${APP_DIR}/"
-# build-id.ts is imported by vite.config.ts at build time; without it the build
-# fails to load its own config.
-cp index.html vite.config.ts build-id.ts tsconfig.json tsconfig.node.json \
-   tailwind.config.js postcss.config.js eslint.config.js "${APP_DIR}/"
+# Everything is built in a staging directory and swapped into place only once the
+# build has succeeded. Previously the script deleted the installed source, copied,
+# then built — so a failed build (or a failed npm ci) left a half-updated install:
+# new server code, new node_modules, old dist, old process still running.
+STAGE_DIR="${APP_DIR}.stage"
+PREV_DIR=""
 
-cd "${APP_DIR}"
+cleanup_stage() {
+    rm -rf "${STAGE_DIR}" 2>/dev/null || true
+}
+trap cleanup_stage EXIT
+
+print_msg "Staging application files..."
+rm -rf "${STAGE_DIR}"
+# APP_DIR is created for the .env step below; the swap replaces it wholesale.
+mkdir -p "${STAGE_DIR}" "${APP_DIR}" "${LOG_DIR}"
+
+# Stage exactly the files git tracks — see deploy.sh for the full rationale: a
+# hand-maintained copy list drifts silently (adding build-id.ts at the repo root
+# broke the deploy), and an exclude list fails open, staging the ignored
+# .env.local/.env.production secrets. `git ls-files` is an allowlist that
+# maintains itself; everything unwanted (.git, node_modules, dist, data, every
+# .env*) falls out for free because none of it is tracked.
+#
+# -z / --null so paths containing spaces or newlines survive. macOS tar is
+# bsdtar, which supports both flags. Files are read from the working tree, not
+# from HEAD, preserving the previous behaviour of deploying what is checked out.
+if ! git -C "${REPO_ROOT}" rev-parse --git-dir >/dev/null 2>&1; then
+    print_error "Not a git repository. deploy-macos.sh stages the files git tracks;"
+    print_error "run it from a clone, not from an extracted archive."
+    exit 1
+fi
+git -C "${REPO_ROOT}" ls-files -z \
+    | tar --null -T - -cf - \
+    | tar -xf - -C "${STAGE_DIR}"
+
+print_msg "Staged application files"
+
+cd "${STAGE_DIR}"
 
 print_msg "Installing dependencies..."
 # No `|| npm install` fallback -- see deploy.sh for why: npm install would deploy
@@ -106,6 +140,8 @@ npm run build
 
 print_msg "Pruning dev dependencies..."
 npm prune --omit=dev
+
+cd "${REPO_ROOT}"
 
 print_msg "Setting up environment (.env)"
 
@@ -335,6 +371,41 @@ else
     fi
 fi
 
+# Hoisted above the swap: the stop step below needs it.
+GUI_TARGET="gui/$(id -u)"
+
+# --- Atomic swap ----------------------------------------------------------
+#
+# Everything above this point has left the live install untouched: the build
+# happened in ${STAGE_DIR}. Now stop the agent, carry live state across, and
+# move the staged tree into place. A failure before this line leaves the
+# previous install running and intact.
+#
+# The agent is stopped *before* the state is copied. DATA_DIR defaults to
+# ${APP_DIR}/data (server/locations.js), so a write landing between the copy
+# and the swap would otherwise be silently lost.
+if launchctl print "${GUI_TARGET}/${PLIST_LABEL}" >/dev/null 2>&1; then
+    print_msg "Stopping ${PLIST_LABEL} for the swap..."
+    launchctl bootout "${GUI_TARGET}" "${PLIST_FILE}" 2>/dev/null || true
+fi
+
+print_msg "Swapping the new build into ${APP_DIR}..."
+if [ -f "${ENV_FILE}" ]; then
+    cp -p "${ENV_FILE}" "${STAGE_DIR}/.env"
+fi
+if [ -d "${APP_DIR}/data" ]; then
+    cp -a "${APP_DIR}/data" "${STAGE_DIR}/data"
+fi
+
+PREV_DIR="${APP_DIR}.old.$$"
+mv "${APP_DIR}" "${PREV_DIR}"
+if ! mv "${STAGE_DIR}" "${APP_DIR}"; then
+    print_error "Swap failed. Restoring the previous install."
+    mv "${PREV_DIR}" "${APP_DIR}"
+    exit 1
+fi
+
+# Create the runtime data dir (location presets persist here as JSON).
 mkdir -p "${APP_DIR}/data"
 
 # .env always 600 so the password isn't readable by other local users.
@@ -393,22 +464,21 @@ cat > "${PLIST_FILE}" << EOF
 EOF
 chmod 644 "${PLIST_FILE}"
 
-GUI_TARGET="gui/$(id -u)"
-
-# Bootout any previous load so the new plist takes effect cleanly.
-if launchctl print "${GUI_TARGET}/${PLIST_LABEL}" >/dev/null 2>&1; then
-    print_msg "Unloading existing LaunchAgent..."
-    launchctl bootout "${GUI_TARGET}" "${PLIST_FILE}" 2>/dev/null || true
-fi
-
+# The old agent was booted out before the swap. Load the fresh plist; `set -e`
+# would abort on a failed bootstrap before the health check below can roll
+# back, so let the check catch a failure instead.
 print_msg "Loading LaunchAgent..."
-launchctl bootstrap "${GUI_TARGET}" "${PLIST_FILE}"
-launchctl enable "${GUI_TARGET}/${PLIST_LABEL}"
+launchctl bootstrap "${GUI_TARGET}" "${PLIST_FILE}" || true
+launchctl enable "${GUI_TARGET}/${PLIST_LABEL}" || true
 launchctl kickstart -k "${GUI_TARGET}/${PLIST_LABEL}" >/dev/null 2>&1 || true
 
 sleep 2
 
 if launchctl print "${GUI_TARGET}/${PLIST_LABEL}" 2>/dev/null | grep -qE 'state\s*=\s*running'; then
+    # The new build is live and healthy. Only now is the previous tree expendable.
+    if [ -n "${PREV_DIR}" ] && [ -d "${PREV_DIR}" ]; then
+        rm -rf "${PREV_DIR}"
+    fi
     print_msg "Service started successfully!"
     print_msg ""
     print_msg "========================================="
@@ -469,5 +539,27 @@ else
     tail -n 25 "${LOG_FILE}" 2>/dev/null || true
     echo ""
     print_error "Full log: ${LOG_FILE}"
+
+    # The new build does not run. Put the previous install back, so a failed
+    # deploy leaves a working service rather than a broken one.
+    if [ -n "${PREV_DIR}" ] && [ -d "${PREV_DIR}" ]; then
+        print_warning "Rolling back to the previous install..."
+        # Unload first: KeepAlive would keep respawning the crashing build
+        # while the trees are swapped back.
+        launchctl bootout "${GUI_TARGET}" "${PLIST_FILE}" 2>/dev/null || true
+        rm -rf "${APP_DIR}"
+        if mv "${PREV_DIR}" "${APP_DIR}"; then
+            launchctl bootstrap "${GUI_TARGET}" "${PLIST_FILE}" 2>/dev/null || true
+            launchctl kickstart -k "${GUI_TARGET}/${PLIST_LABEL}" >/dev/null 2>&1 || true
+            sleep 2
+            if launchctl print "${GUI_TARGET}/${PLIST_LABEL}" 2>/dev/null | grep -qE 'state\s*=\s*running'; then
+                print_msg "Rolled back; the previous version is running again."
+            else
+                print_error "Rollback restored ${APP_DIR} but the service still will not start."
+            fi
+        else
+            print_error "Rollback FAILED. The previous install is at ${PREV_DIR}."
+        fi
+    fi
     exit 1
 fi
