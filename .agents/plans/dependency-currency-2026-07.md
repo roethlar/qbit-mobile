@@ -1,6 +1,8 @@
 # Plan: Dependency currency after the 2026-07 CI audit failure
 
-Status: Drafted 2026-07-10. Not approved. No code changes made under this plan.
+Status: Drafted 2026-07-10; approved and executed the same day. The Express 4 → 5
+migration below is **done** (`cc69364`, `1ceca1c`). What remains is the deferred Node
+item and the one open question at the end.
 
 ## Goal
 
@@ -89,29 +91,39 @@ promises from async handlers to the error middleware automatically. The proxy's 
 routes currently rely on explicit `try/catch`; the change should be a no-op, but the
 error-path tests must confirm it.
 
-### Slices, one commit each
+### Slices — executed 2026-07-10
 
-1. Change the SPA catch-all to an Express 5 compatible wildcard, still on Express 4.
-   Both `'*'` and `'/*splat'` are unsupported/supported respectively — verify the
-   chosen form works on 4 first, so the routing change and the major bump are never
-   in flight together.
-2. Bump `express` to `^5.2.1`. Run the full check set plus a manual smoke test of the
-   live UI against a running qBittorrent, because no automated test serves the SPA
-   shell from `dist/`.
-3. Re-verify the security boundary explicitly: the endpoint allowlist still 404s
-   `/app/shutdown` and friends, the auth gate still fails closed, and the add-torrent
-   field allowlist still rejects unknown fields. These have tests
-   (`server/__tests__/proxy.test.js`); confirm they pass unmodified. A test that had to
-   be edited to accommodate Express 5 is a signal to stop and reassess.
+1. **Done, `cc69364`.** SPA catch-all `app.get('*')` → `app.get(/.*/)`, landed while
+   still on Express 4. A RegExp is valid on both majors; `'/*splat'` is v5-only. Also
+   closed a coverage hole found while doing it: `server.js` registers the fallback only
+   when `./dist` exists, and CI runs `npm test` before `npm run build`, so the route was
+   absent under CI and present locally. `test/setup.ts` now seeds a placeholder shell.
+   Three tests added, including one asserting the fallback does not shadow the JSON 404
+   for unmatched `/api` routes.
+2. **Done, `1ceca1c`.** `express` `^4.21.2` → `^5.2.1`. All 134 tests pass with no test
+   file modified.
+3. **Done, folded into `1ceca1c`.** Security boundary re-verified. The allowlist,
+   fail-closed auth, and add-torrent field allowlist assertions pass unchanged.
 
-### Verification
+### Verification performed
 
 `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` after each slice, on
-both Node 22 and 24 if practical. Plus the manual SPA smoke test in slice 2 — the
-catch-all route is exactly what the automated suite does not cover.
+Node 26 (the developer machine). Not run per-slice on Node 22/24 locally; the CI matrix
+covers those on push.
 
-This is a security-relevant change per `.agents/repo-guidance.md`; it needs owner
-approval before slice 1 and a security review before merge.
+Guard proof for slice 1: with `express@5` installed and `app.get('*')` restored, the
+proxy suite does not merely fail — it fails to load (`Missing parameter name at index
+1: *`), and the server would refuse to boot. The fix is load-bearing.
+
+Manual smoke test against a real boot on express 5.2.1 serving the real `./dist`:
+deep link → 200 `text/html` (actual `index.html`); `POST /api/v2/app/shutdown` → 404
+JSON; unmatched `/api/v2/log/main` → 404 JSON, not the HTML shell; unauthenticated
+`/api/v2/torrents/info` → 401; static asset → 200.
+
+**Not verified:** the live UI against a running qBittorrent. Upstream proxying was
+exercised only through mocked axios in the test suite and through the proxy's own
+404/401 paths in the smoke test. A real add-torrent round trip has not been run since
+the upgrade.
 
 ## Deferred, with a trigger rather than a date
 
