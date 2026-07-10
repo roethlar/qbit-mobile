@@ -83,45 +83,51 @@ for required in server src public package.json; do
     fi
 done
 
-print_msg "Creating application directory at ${APP_DIR}..."
-mkdir -p "${APP_DIR}"
+REPO_ROOT="$(pwd)"
 
-print_msg "Copying application files..."
+# Everything is built in a staging directory and swapped into place only once the
+# build has succeeded. Previously the script deleted the installed source, copied,
+# then built — so a failed build (or a failed npm ci) left a half-updated install:
+# new server code, new node_modules, old dist, old process still running.
+STAGE_DIR="${APP_DIR}.stage"
+PREV_DIR=""
 
-# Wipe directories that may contain files removed since the last release so
-# reinstalls don't keep stale source around. .env, node_modules, and dist
-# are intentionally preserved. We also remove files an older buggy deploy
-# may have spilled into the app root (BSD vs GNU cp trailing-slash quirk).
-rm -rf "${APP_DIR}/server" "${APP_DIR}/src" "${APP_DIR}/public"
-rm -rf "${APP_DIR}/__tests__" "${APP_DIR}/components" "${APP_DIR}/contexts" \
-       "${APP_DIR}/hooks" "${APP_DIR}/pages" "${APP_DIR}/routes" \
-       "${APP_DIR}/services" "${APP_DIR}/types" "${APP_DIR}/utils"
-rm -f "${APP_DIR}/App.tsx" "${APP_DIR}/main.tsx" "${APP_DIR}/index.css" \
-      "${APP_DIR}/manifest.json" "${APP_DIR}/qbClient.js" "${APP_DIR}/server.js"
+cleanup_stage() {
+    rm -rf "${STAGE_DIR}" 2>/dev/null || true
+}
+trap cleanup_stage EXIT
 
-# No trailing slash on the source path — on BSD cp (macOS) `cp -r src/ dest/`
-# copies the *contents* of src into dest instead of creating dest/src/.
-cp -R server "${APP_DIR}/"
-cp -R src "${APP_DIR}/"
-cp -R public "${APP_DIR}/"
+print_msg "Staging application files..."
+rm -rf "${STAGE_DIR}"
+# APP_DIR is created for the .env step below; the swap replaces it wholesale.
+mkdir -p "${STAGE_DIR}" "${APP_DIR}"
 
-cp package.json "${APP_DIR}/"
-cp package-lock.json "${APP_DIR}/"
-cp .env.example "${APP_DIR}/"
-cp index.html "${APP_DIR}/"
-cp vite.config.ts "${APP_DIR}/"
-# vite.config.ts imports this at build time; without it the build fails to load
-# its own config.
-cp build-id.ts "${APP_DIR}/"
-cp tsconfig.json "${APP_DIR}/"
-cp tsconfig.node.json "${APP_DIR}/"
-cp tailwind.config.js "${APP_DIR}/"
-cp postcss.config.js "${APP_DIR}/"
-cp eslint.config.js "${APP_DIR}/"
+# Copy everything EXCEPT the excludes, rather than listing what to include.
+#
+# An include list fails closed against new files: adding build-id.ts at the repo
+# root and importing it from vite.config.ts broke this script, because nobody
+# remembered to extend the list. An exclude list fails open — a forgotten exclude
+# wastes disk, a forgotten include breaks the deploy. Prefer the harmless failure.
+#
+# This also retires the old block of `rm -rf "${APP_DIR}/contexts"`-style lines:
+# each was a fossil of a past reorganization that stranded stale files on a live
+# install. A fresh staging directory cannot inherit them.
+tar -cf - \
+    --exclude=./.git \
+    --exclude=./node_modules \
+    --exclude=./dist \
+    --exclude=./data \
+    --exclude=./.env \
+    --exclude=./coverage \
+    --exclude=./.agents \
+    --exclude=./.github \
+    --exclude=./.claude \
+    --exclude=./docs \
+    . | tar -xf - -C "${STAGE_DIR}"
 
-print_msg "Copied essential files for build and runtime"
+print_msg "Staged application files"
 
-cd "${APP_DIR}"
+cd "${STAGE_DIR}"
 
 print_msg "Installing dependencies..."
 # No `|| npm install` fallback. `npm ci` installs exactly the lockfile that was
@@ -136,6 +142,8 @@ npm run build
 # Drop dev dependencies — faster than a full reinstall.
 print_msg "Pruning dev dependencies..."
 npm prune --omit=dev
+
+cd "${REPO_ROOT}"
 
 # Service user configuration. Recommend the dedicated qbitmobile user for
 # better isolation than the shared nobody account.
@@ -443,6 +451,37 @@ else
     fi
 fi
 
+# --- Atomic swap ----------------------------------------------------------
+#
+# Everything above this point has left the live install untouched: the build
+# happened in ${STAGE_DIR}. Now stop the service, carry live state across, and
+# move the staged tree into place. A failure before this line leaves the previous
+# install running and intact.
+#
+# The service is stopped *before* the state is copied. DATA_DIR defaults to
+# ${APP_DIR}/data (server/locations.js), so a write landing between the copy and
+# the swap would otherwise be silently lost.
+if systemctl is-active --quiet "${SERVICE_NAME}" 2>/dev/null; then
+    print_msg "Stopping ${SERVICE_NAME} for the swap..."
+    systemctl stop "${SERVICE_NAME}"
+fi
+
+print_msg "Swapping the new build into ${APP_DIR}..."
+if [ -f "${ENV_FILE}" ]; then
+    cp -p "${ENV_FILE}" "${STAGE_DIR}/.env"
+fi
+if [ -d "${APP_DIR}/data" ]; then
+    cp -a "${APP_DIR}/data" "${STAGE_DIR}/data"
+fi
+
+PREV_DIR="${APP_DIR}.old.$$"
+mv "${APP_DIR}" "${PREV_DIR}"
+if ! mv "${STAGE_DIR}" "${APP_DIR}"; then
+    print_error "Swap failed. Restoring the previous install."
+    mv "${PREV_DIR}" "${APP_DIR}"
+    exit 1
+fi
+
 # Create the runtime data dir (location presets persist here as JSON).
 # Service unit grants ReadWritePaths to just this directory; the rest of
 # the install stays read-only under ProtectSystem=strict.
@@ -516,10 +555,15 @@ if systemctl is-active --quiet "${SERVICE_NAME}"; then
 fi
 
 print_msg "Starting ${SERVICE_NAME} service..."
-systemctl start "${SERVICE_NAME}"
+# `set -e` would abort here on a failed start, before the rollback below can run.
+systemctl start "${SERVICE_NAME}" || true
 
 sleep 2
 if systemctl is-active --quiet "${SERVICE_NAME}"; then
+    # The new build is live and healthy. Only now is the previous tree expendable.
+    if [ -n "${PREV_DIR}" ] && [ -d "${PREV_DIR}" ]; then
+        rm -rf "${PREV_DIR}"
+    fi
     print_msg "Service started successfully!"
     print_msg ""
     print_msg "========================================="
@@ -586,5 +630,23 @@ else
     journalctl -u "${SERVICE_NAME}" -n 25 --no-pager 2>&1 || true
     echo ""
     print_error "Full logs: journalctl -u ${SERVICE_NAME} -n 100"
+
+    # The new build does not run. Put the previous install back, so a failed
+    # deploy leaves a working service rather than a broken one.
+    if [ -n "${PREV_DIR}" ] && [ -d "${PREV_DIR}" ]; then
+        print_warning "Rolling back to the previous install..."
+        rm -rf "${APP_DIR}"
+        if mv "${PREV_DIR}" "${APP_DIR}"; then
+            systemctl start "${SERVICE_NAME}" || true
+            sleep 2
+            if systemctl is-active --quiet "${SERVICE_NAME}"; then
+                print_msg "Rolled back; the previous version is running again."
+            else
+                print_error "Rollback restored ${APP_DIR} but the service still will not start."
+            fi
+        else
+            print_error "Rollback FAILED. The previous install is at ${PREV_DIR}."
+        fi
+    fi
     exit 1
 fi
