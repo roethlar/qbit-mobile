@@ -94,6 +94,27 @@ describe('deploy.sh copies by default rather than by manifest', () => {
   });
 });
 
+// The supported Node floor is declared once, in package.json `engines.node`.
+// deploy.sh, deploy-macos.sh and deploy.ps1 each used to restate it as a literal
+// "22.12", which is how three copies drifted from the one that matters.
+describe('deploy.sh reads the Node floor from package.json', () => {
+  const enginesNode = (JSON.parse(read('package.json')) as { engines: { node: string } }).engines.node;
+
+  it('does not hardcode a version floor', () => {
+    const code = stripComments(read('deploy.sh'));
+    expect(code).toContain("engines.node");
+    expect(code, 'deploy.sh hardcodes a Node major').not.toMatch(/-lt\s+2[0-9]\b/);
+  });
+
+  it('engines.node stays in the >=X.Y.Z form the script can parse', () => {
+    // deploy.sh aborts rather than guessing when this does not match. Changing
+    // engines.node to e.g. "^20.19.0 || >=22.12.0" would break every deploy, so
+    // fail here instead -- in CI, where it is cheap.
+    const floor = /^>=(\d+)\.(\d+)/.exec(enginesNode);
+    expect(floor, `engines.node "${enginesNode}" is not a plain >=X.Y[.Z] range`).not.toBeNull();
+  });
+});
+
 // `npm ci` installs exactly the lockfile that CI tested and `npm audit` checked.
 // Falling back to `npm install` on failure resolves fresh versions from the
 // registry, deploying a dependency tree nothing verified -- as root, on the host

@@ -50,38 +50,49 @@ print_msg "Checking prerequisites..."
 
 NODE_BIN=$(command -v node || true)
 if [ -z "${NODE_BIN}" ]; then
-    print_error "Node.js is not installed. Please install Node.js 22.12+ first."
+    print_error "Node.js is not installed. Install Node.js first (see package.json engines)."
     exit 1
 fi
 # Resolve symlinks so the systemd unit gets a stable absolute path even when
 # the operator uses nvm/asdf/snap/Volta where 'node' is a shim.
 NODE_BIN=$(readlink -f "${NODE_BIN}" 2>/dev/null || echo "${NODE_BIN}")
 
-# Vite 8 / @vitejs/plugin-react require ^20.19.0 || >=22.12.0; we only ship the
-# 22.x branch, so enforce the minor floor too — a bare major check lets
-# 22.0..22.11 slip through and then npm install or the build later breaks.
-NODE_VER_STR=$("${NODE_BIN}" -v | sed 's/^v//')
-NODE_MAJOR=$(echo "$NODE_VER_STR" | cut -d. -f1)
-NODE_MINOR=$(echo "$NODE_VER_STR" | cut -d. -f2)
-if [ "$NODE_MAJOR" -lt 22 ] || { [ "$NODE_MAJOR" -eq 22 ] && [ "$NODE_MINOR" -lt 12 ]; }; then
-    print_error "Node.js 22.12+ is required. Current version: v${NODE_VER_STR}"
-    exit 1
-fi
-
 if ! command -v npm &> /dev/null; then
     print_error "npm is not installed. Please install npm first."
     exit 1
 fi
 
-# Refuse to run anywhere but the repo root. The copy step below deletes the
-# installed server/src/public first; from the wrong CWD that would wipe the
-# live install and then fail on the copy.
+# Refuse to run anywhere but the repo root: the staging copy below archives the
+# current directory, so from the wrong CWD it would stage the wrong tree.
 for required in server src public package.json; do
     if [ ! -e "${required}" ]; then
         print_error "Run this script from the qbit-mobile repo root (missing ./${required})."
         exit 1
     fi
 done
+
+# The supported Node floor is declared once, in package.json `engines.node`, and
+# read from there. It used to be restated as a literal `22.12` here and in the
+# macOS and Windows scripts, which is how three copies drifted from the one that
+# matters. Enforce the minor too: a bare major check lets 22.0..22.11 through,
+# and the build then fails deep inside vite.
+ENGINES_NODE=$("${NODE_BIN}" -p "require('./package.json').engines.node" 2>/dev/null || true)
+NODE_FLOOR=$(printf '%s' "${ENGINES_NODE}" | sed -n 's/^>=\([0-9][0-9]*\.[0-9][0-9]*\).*/\1/p')
+if [ -z "${NODE_FLOOR}" ]; then
+    print_error "Could not read a '>=X.Y' floor from package.json engines.node (got: '${ENGINES_NODE}')."
+    exit 1
+fi
+FLOOR_MAJOR=${NODE_FLOOR%%.*}
+FLOOR_MINOR=${NODE_FLOOR##*.}
+
+NODE_VER_STR=$("${NODE_BIN}" -v | sed 's/^v//')
+NODE_MAJOR=$(echo "$NODE_VER_STR" | cut -d. -f1)
+NODE_MINOR=$(echo "$NODE_VER_STR" | cut -d. -f2)
+if [ "$NODE_MAJOR" -lt "$FLOOR_MAJOR" ] \
+   || { [ "$NODE_MAJOR" -eq "$FLOOR_MAJOR" ] && [ "$NODE_MINOR" -lt "$FLOOR_MINOR" ]; }; then
+    print_error "Node.js ${NODE_FLOOR}+ is required. Current version: v${NODE_VER_STR}"
+    exit 1
+fi
 
 REPO_ROOT="$(pwd)"
 
