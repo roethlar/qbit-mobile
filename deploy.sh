@@ -110,6 +110,9 @@ cp package-lock.json "${APP_DIR}/"
 cp .env.example "${APP_DIR}/"
 cp index.html "${APP_DIR}/"
 cp vite.config.ts "${APP_DIR}/"
+# vite.config.ts imports this at build time; without it the build fails to load
+# its own config.
+cp build-id.ts "${APP_DIR}/"
 cp tsconfig.json "${APP_DIR}/"
 cp tsconfig.node.json "${APP_DIR}/"
 cp tailwind.config.js "${APP_DIR}/"

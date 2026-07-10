@@ -89,7 +89,9 @@ cp -R server  "${APP_DIR}/"
 cp -R src     "${APP_DIR}/"
 cp -R public  "${APP_DIR}/"
 cp package.json package-lock.json .env.example "${APP_DIR}/"
-cp index.html vite.config.ts tsconfig.json tsconfig.node.json \
+# build-id.ts is imported by vite.config.ts at build time; without it the build
+# fails to load its own config.
+cp index.html vite.config.ts build-id.ts tsconfig.json tsconfig.node.json \
    tailwind.config.js postcss.config.js eslint.config.js "${APP_DIR}/"
 
 cd "${APP_DIR}"

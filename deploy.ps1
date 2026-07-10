@@ -97,8 +97,10 @@ foreach ($d in @('server','src','public')) {
 Copy-Item -Path .\server -Destination $AppDir -Recurse -Force
 Copy-Item -Path .\src    -Destination $AppDir -Recurse -Force
 Copy-Item -Path .\public -Destination $AppDir -Recurse -Force
+# build-id.ts is imported by vite.config.ts at build time; without it the build
+# fails to load its own config.
 $flatFiles = @('package.json','package-lock.json','.env.example','index.html',
-               'vite.config.ts','tsconfig.json','tsconfig.node.json',
+               'vite.config.ts','build-id.ts','tsconfig.json','tsconfig.node.json',
                'tailwind.config.js','postcss.config.js','eslint.config.js')
 foreach ($f in $flatFiles) {
     Copy-Item -Path $f -Destination $AppDir -Force
