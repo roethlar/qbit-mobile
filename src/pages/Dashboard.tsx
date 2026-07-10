@@ -338,6 +338,7 @@ export function Dashboard({ onShowSettings }: DashboardProps) {
       ) : (
         <Header
           title="qBit Mobile"
+          titleSuffix={<span title={`Build ${__BUILD_ID__}`}>v{__BUILD_ID__}</span>}
           leftButton={
             !online ? (
               <span

@@ -21,6 +21,14 @@ export default defineConfig({
         },
       },
       {
+        // vite.config.ts is not loaded here, so __BUILD_ID__ (injected there
+        // via `define`) would be undefined under test. Pin it: the real value
+        // embeds a build timestamp and would make assertions non-deterministic.
+        // `define` must sit on the project, not the root config -- projects do
+        // not inherit it.
+        define: {
+          __BUILD_ID__: JSON.stringify('1.5.2+testbuild.2601010000'),
+        },
         test: {
           name: 'ui',
           environment: 'jsdom',

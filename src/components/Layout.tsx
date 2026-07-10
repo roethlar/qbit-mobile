@@ -28,12 +28,14 @@ export function Layout({ children, className, padding = true }: LayoutProps) {
 
 interface HeaderProps {
   title: string;
+  /** Small muted text after the title, e.g. the build id. */
+  titleSuffix?: ReactNode;
   leftButton?: ReactNode;
   rightButton?: ReactNode;
   className?: string;
 }
 
-export function Header({ title, leftButton, rightButton, className }: HeaderProps) {
+export function Header({ title, titleSuffix, leftButton, rightButton, className }: HeaderProps) {
   return (
     <header className={clsx(
       'sticky top-safe-top z-10',
@@ -49,9 +51,19 @@ export function Header({ title, leftButton, rightButton, className }: HeaderProp
             {leftButton}
           </div>
         )}
-        <h1 className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+        <h1 className={clsx(
+          'text-sm font-medium text-gray-900 dark:text-gray-100 truncate',
+          titleSuffix && 'flex-shrink-0',
+        )}>
           {title}
         </h1>
+        {titleSuffix && (
+          // Shrinks before the title does, so a long build id never squeezes
+          // "qBit Mobile" off a narrow phone screen.
+          <span className="ml-2 min-w-0 truncate text-[10px] font-normal text-gray-400 dark:text-gray-500">
+            {titleSuffix}
+          </span>
+        )}
       </div>
       {rightButton && (
         <div className="ml-3 flex-shrink-0">
