@@ -23,9 +23,10 @@ short and update it when important repo facts change.
 
 ## Verification
 
-- Automated (mirrors CI): `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`.
-  See `.agents/repo-map.json` for the canonical command list. CI also runs
-  `npm audit --omit=dev --audit-level=high`.
+- Automated (mirrors the CI build job): `npm run lint`, `npm run typecheck`, `npm test`,
+  `npm run build`. See `.agents/repo-map.json` for the canonical command list.
+  `npm audit --omit=dev --audit-level=high` no longer runs in the build job; it has its
+  own weekly workflow (`.github/workflows/audit.yml`). See `.agents/decisions.md`.
 - Behavior not covered by automation (the live UI against a running qBittorrent, the
   deploy/uninstall scripts) needs a manual check or an explicit note that it was not run.
 

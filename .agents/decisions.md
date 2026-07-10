@@ -56,27 +56,50 @@ exits at lines ~50 and ~57-63; `ALLOWED_SET_PREF_KEYS`), `server/routes/torrents
 Status: Active
 
 Decision:
-The supported Node version is `>=22.12.0` (`package.json` `engines`), and CI runs on
-Node 22.
+The supported Node version is `>=22.12.0` (`package.json` `engines`). CI exercises both
+Node 22 (the declared floor) and Node 24 (Active LTS) via a build matrix.
 
 Reason:
 Vite 8 requires `^20.19.0 || >=22.12.0`; the floor was deliberately tightened to match
 (commit "Tighten Node floor to 22.12 to match Vite 8 engines"). Building or testing on
 older Node is unsupported.
 
-### CI gates merges to main
+The floor stays at 22.12 rather than rising to 24: `deploy.sh`, `deploy-macos.sh`, and
+`deploy.ps1` each enforce 22.12+ at install time, so raising it would break self-hosted
+installs on a runtime that is still supported (Node 22 receives fixes until 2027-04-30).
+CI tests the floor as well as Active LTS so the `engines` claim is proven, not assumed.
 
-Status: Active
+### CI gates merges to main; the dependency audit runs separately
+
+Status: Active. Supersedes the earlier form of this decision, in which
+`npm audit` ran inside the blocking CI build job.
 
 Decision:
-`.github/workflows/ci.yml` runs lint, typecheck, test, build, and a production
-`npm audit` on every push and pull request to `main`. The local verification command
-set is kept aligned with these CI steps.
+`.github/workflows/ci.yml` runs lint, typecheck, test, and build on every push and pull
+request to `main`, across a Node 22/24 matrix. The production dependency audit
+(`npm audit --omit=dev --audit-level=high`) runs in its own workflow,
+`.github/workflows/audit.yml`, on a weekly schedule and on manual dispatch.
+`.github/dependabot.yml` tracks production deps, dev deps, and the workflow actions
+themselves. The local verification command set is kept aligned with the CI build steps.
 
 Reason:
-Confirmed the workflow lives in a provider-executable path (`.github/workflows/`) and its
-branch triggers (`main`) match the repo's current branch, so it actually runs. Keeping
-local checks aligned with CI avoids "passes locally, fails in CI" drift.
+Confirmed the workflows live in a provider-executable path (`.github/workflows/`) and
+their branch triggers (`main`) match the repo's current branch, so they actually run.
+Keeping local checks aligned with CI avoids "passes locally, fails in CI" drift.
+
+The audit was split out because both CI failures in this repo's history were the audit
+step failing on an advisory published against an already-shipped dependency
+(`form-data`/`qs` in 2026-06, `multer` in 2026-07), not a regression in the change under
+test. A blocking audit turns the next unrelated push red and blames a commit that did not
+cause the problem and often cannot fix it. Dependency currency does not prevent this:
+the advisory lands against the version already in use, so being fully up to date on the
+morning of disclosure still fails the build that afternoon.
+
+Trade-off, accepted deliberately: a high-severity production advisory no longer blocks
+merge. Coverage is preserved by the weekly audit run plus Dependabot security update
+PRs (which require "Dependabot security updates" enabled in GitHub repo settings;
+enabled 2026-07-10). This is a routing change, not a relaxation of the security
+boundary described above — the proxy allowlists and auth gate are untouched.
 
 ## Open Decisions (deferred - not yet adopted)
 

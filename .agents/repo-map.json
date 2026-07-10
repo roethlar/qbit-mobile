@@ -56,7 +56,8 @@
     ".agents/push-policy.md"
   ],
   "notes": [
-    "CI (.github/workflows/ci.yml) runs lint, typecheck, test, build, and npm audit --omit=dev --audit-level=high on push and PR to main; confirmed it sits in a provider-executable path with branch triggers matching the current branch.",
+    "CI (.github/workflows/ci.yml) runs lint, typecheck, test, and build on push and PR to main, across a Node 22/24 matrix; confirmed it sits in a provider-executable path with branch triggers matching the current branch.",
+    "The production dependency audit (npm audit --omit=dev --audit-level=high) runs weekly and on manual dispatch in .github/workflows/audit.yml, not in the blocking build job; see .agents/decisions.md for the rationale and accepted trade-off.",
     "docs/code-review.md and docs/static-code-review-2026-05-04.md are dated review snapshots (history), not current state; verify their claims against current code before relying on them."
   ]
 }
