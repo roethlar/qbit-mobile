@@ -1,6 +1,11 @@
 # Plan: deploy script hardening
 
-Status: Drafted 2026-07-10, owner approved ("plan and fix").
+Status: Drafted 2026-07-10, owner approved ("plan and fix"), all three slices landed
+the same day (`e676d08`, `ac7676a`, `9450415`).
+
+**Owner verification still outstanding:** no `sudo ./deploy.sh` run has exercised the
+staging swap, the rollback path, or the systemd interaction. Until it has, treat the
+atomic swap as designed-and-unit-tested, not proven.
 
 ## Why
 
@@ -74,6 +79,27 @@ source of truth. Low severity, real drift.
 `deploy-macos.sh` and `deploy.ps1` get slice 1 only. Slices 2 and 3 for those platforms
 are deferred: neither can be exercised from this machine, and an untested rewrite of a
 destructive root script is worse than a known-brittle one. Recorded as follow-up.
+
+## Outcome
+
+1. `e676d08` — `npm ci` fallback deleted in all three scripts, guarded by a test that
+   strips comments before matching.
+2. `ac7676a` — `deploy.sh` stages into `${APP_DIR}.stage`, copies by exclusion, swaps
+   atomically, keeps `${APP_DIR}.old.$$` until the service is healthy, and rolls back on
+   a failed start. The exclude set was verified by replicating the exact `tar`
+   invocation into a temp dir and building from the result (`1.6.4+nogit.<ts>`).
+3. `9450415` — `deploy.sh` reads `engines.node` from `package.json`, failing closed on an
+   unparseable range.
+
+## Follow-ups
+
+- **Owner must run `sudo ./deploy.sh`.** The swap, rollback, and systemd paths are
+  unverified by automation. The rollback branch in particular has never executed.
+- `deploy-macos.sh` and `deploy.ps1` still carry the include list, the non-atomic copy,
+  and a hardcoded Node floor. `deploy.ps1`'s syntax is unverified — `pwsh` is not
+  installed on the development machine.
+- The `${APP_DIR}.old.$$` tree doubles peak disk use during a deploy. Acceptable for this
+  app; worth knowing if the install grows.
 
 ## Non-goals
 
