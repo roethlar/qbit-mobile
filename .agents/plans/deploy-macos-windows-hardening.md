@@ -1,10 +1,8 @@
 # Spec: port deploy.sh hardening to macOS and Windows
 
-Status: Drafted 2026-07-10. **For a future Claude Code session running ON macOS / ON
-Windows** — the platform where the target script can actually be executed and tested.
-Not executable from the Linux dev machine (no way to run launchd, `pwsh`, Scheduled
-Tasks, or bsdtar behaviour there). Do the macOS half on a Mac, the Windows half on
-Windows; they are independent.
+Status: Drafted 2026-07-10; **both halves implemented 2026-07-10** on the Mac dev
+machine (commits `a16fd10` macOS, `88f0780` Windows). See Outcome at the end for
+what was verified and what still needs an owner run on Windows.
 
 ## Reference implementation
 
@@ -127,3 +125,41 @@ change (the swap leaves a single `$APP_DIR`, and `.old.$$` is always cleaned up 
 success and rollback). No edit needed, but confirm no `.stage`/`.old` residue is left by
 an interrupted run — if found, have uninstall sweep `${APP_DIR}.stage` and
 `${APP_DIR}.old.*` too.
+
+## Outcome (2026-07-10)
+
+Both halves landed from the macOS dev machine, one commit each, per the spec above.
+
+**macOS — `a16fd10`, fully verified with real runs on this Mac:**
+
+- bsdtar accepts `--null -T - -cf -` / `-xf - -C`; the staged file set was diffed
+  against `git ls-files` and is identical.
+- Fresh install (port 3777, host 127.0.0.1): agent running, 401 unauthenticated /
+  200 authenticated, `.env` 600, dir 700, no `.stage`/`.old` residue.
+- Upgrade over it: the install dir's inode changed (tree really swapped) while
+  `.env` stayed byte-identical (md5) and a planted `data/upgrade-marker.txt`
+  survived.
+- Forced build failure (broken `vite.config.ts`): deploy died in staging, exit 1;
+  the live install kept the same pid and inode; the EXIT trap removed the stage.
+- Forced boot failure (throw at the top of `server/server.js`): **the rollback
+  branch executed for the first time on any platform** — health check failed,
+  the previous tree was restored (same inode as before the deploy), and the old
+  version came back up healthy. Deploy exited 1.
+- `uninstall-macos.sh` (now sweeping `.stage`/`.old.*`) removed everything.
+
+**Windows — `88f0780`, verified as far as macOS allows:**
+
+- `deploy.ps1` and `uninstall.ps1` parse clean under pwsh 7.6
+  (`Language.Parser::ParseFile`) — the syntax check this spec flagged as never
+  previously possible.
+- The `git ls-files` → `Copy-Item` staging loop was executed verbatim against
+  this repo on pwsh: all 127 tracked files staged identically to `git ls-files`.
+- **Still unverified, needs an owner run on Windows:** the Scheduled Task paths —
+  swap under a running task (file locks), rollback, post-swap ACL tightening,
+  and an upgrade preserving `.env` + `data\`. Until then treat the ps1 swap as
+  designed-and-parse-checked, not proven.
+
+`test/deploy-manifest.test.ts` now checks all three scripts structurally (git
+staging, no exclude list, staged swap, engines-derived floor); the manifest-copy
+checks are retired. Each new assertion set was proven non-vacuous by running it
+against the pre-change script (5 failures for macOS, 4 for ps1).
