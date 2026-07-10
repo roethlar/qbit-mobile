@@ -59,6 +59,23 @@ or a clear note that it was not run.
 - `origin` — `http://q.internal:3000/michael/qbit-mobile` (fetch and push).
 - Push policy is recorded separately in `.agents/push-policy.md`.
 
+## Versioning
+
+Every commit that changes shipped code bumps `version` in `package.json` (and the
+matching `packages[""].version` in `package-lock.json`), in that same commit:
+
+- **patch** — bug fix, dependency bump, or any change with no user-visible behavior change.
+- **minor** — new user-visible capability.
+- **major** — a breaking change to deployment, configuration, or the app's contract.
+
+Shipped code means anything reaching a deployed user: `src/`, `server/`, `index.html`,
+build config, the deploy scripts. Commits touching only `.agents/`, `docs/`, `README.md`,
+tests, or CI workflows do not bump.
+
+This is separate from the build id shown in the UI header (`build-id.ts`), which
+appends a commit ref and timestamp so that *individual builds* are distinguishable.
+The version says what changed; the build id says which build. See `.agents/decisions.md`.
+
 ## Earned Practices
 
 None beyond the portable Git Safety rules already stated in `AGENTS.md`

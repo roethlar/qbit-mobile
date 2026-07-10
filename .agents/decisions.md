@@ -141,6 +141,30 @@ route was absent under CI while present on any developer machine that had built 
 two environments silently disagreed and the route shipped untested. `vite build` empties
 the directory afterwards, so the placeholder never reaches a release artifact.
 
+### Every commit that changes shipped code bumps the version
+
+Status: Active (adopted 2026-07-10, owner instruction)
+
+Decision:
+Recorded as a rule in `.agents/repo-guidance.md` (Versioning). Patch for fixes and
+dependency bumps, minor for new user-visible capability, major for breaking changes.
+Docs, tests, `.agents/`, and CI-only commits do not bump.
+
+Reason:
+Owner's stated rule: "increment version number appropriately for every build." The
+literal reading — auto-incrementing inside `npm run build` — was rejected: `npm run
+build` runs in CI and inside `deploy.sh`, so it would dirty the tree mid-CI and put
+`package.json` at odds with `package-lock.json` after `npm ci`. The owner confirmed the
+intended trigger is every shipped change.
+
+Evidence that the rule was needed: `version` sat at 1.5.2 across the entire 2026-07-10
+sweep (multer, the CI/audit restructure, Express 5, and a new UI feature), so the
+version could not distinguish a pre-sweep deploy from a post-sweep one.
+
+Distinct from the build id (`build-id.ts`), which exists because a version number cannot
+identify an individual build — notably in `deploy.sh`, which builds from a copied tree
+with no `.git`. Version answers "what changed"; build id answers "which build".
+
 ## Open Decisions (deferred - not yet adopted)
 
 Assessed findings the owner chose to record as a future decision rather than
