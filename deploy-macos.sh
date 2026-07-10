@@ -97,7 +97,9 @@ cp index.html vite.config.ts build-id.ts tsconfig.json tsconfig.node.json \
 cd "${APP_DIR}"
 
 print_msg "Installing dependencies..."
-npm ci || npm install
+# No `|| npm install` fallback -- see deploy.sh for why: npm install would deploy
+# a dependency tree that was never tested or audited.
+npm ci
 
 print_msg "Building frontend..."
 npm run build

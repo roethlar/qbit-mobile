@@ -124,7 +124,11 @@ print_msg "Copied essential files for build and runtime"
 cd "${APP_DIR}"
 
 print_msg "Installing dependencies..."
-npm ci || npm install
+# No `|| npm install` fallback. `npm ci` installs exactly the lockfile that was
+# tested and audited; `npm install` would resolve fresh versions from the
+# registry, deploying a tree nothing verified. If npm ci fails, the lockfile is
+# wrong and the deploy must stop.
+npm ci
 
 print_msg "Building frontend..."
 npm run build

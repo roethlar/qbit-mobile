@@ -43,3 +43,22 @@ describe('deploy scripts copy everything vite.config.ts needs', () => {
     expect(read(script)).toContain('vite.config.ts');
   });
 });
+
+// `npm ci` installs exactly the lockfile that CI tested and `npm audit` checked.
+// Falling back to `npm install` on failure resolves fresh versions from the
+// registry, deploying a dependency tree nothing verified -- as root, on the host
+// fronting qBittorrent. A failing `npm ci` means the lockfile is wrong; the
+// deploy must stop, not paper over it.
+describe('deploy scripts never fall back from npm ci to npm install', () => {
+  it.each(DEPLOY_SCRIPTS)('%s does not fall back to npm install', (script) => {
+    const contents = read(script);
+    expect(contents).not.toMatch(/npm ci\s*\|\|\s*npm install/);
+    expect(contents).not.toMatch(/falling back to npm install/i);
+    // The PowerShell form: a bare `npm install` invocation anywhere.
+    expect(contents).not.toMatch(/&\s*npm install/);
+  });
+
+  it.each(DEPLOY_SCRIPTS)('%s still runs npm ci', (script) => {
+    expect(read(script)).toMatch(/npm ci/);
+  });
+});

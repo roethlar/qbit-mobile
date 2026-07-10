@@ -109,12 +109,10 @@ foreach ($f in $flatFiles) {
 Push-Location $AppDir
 try {
     Write-Msg "Installing dependencies..."
+    # No fallback to `npm install` -- see deploy.sh for why: it would resolve
+    # fresh versions from the registry and deploy a tree nothing tested.
     & npm ci
-    if ($LASTEXITCODE -ne 0) {
-        Write-Warn "npm ci failed; falling back to npm install..."
-        & npm install
-        if ($LASTEXITCODE -ne 0) { throw "npm install failed" }
-    }
+    if ($LASTEXITCODE -ne 0) { throw "npm ci failed (lockfile out of sync?)" }
 
     Write-Msg "Building frontend..."
     & npm run build
