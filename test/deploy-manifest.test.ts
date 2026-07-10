@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
@@ -61,36 +62,61 @@ describe('manifest-style deploy scripts copy everything vite.config.ts needs', (
   });
 });
 
-describe('deploy.sh copies by default rather than by manifest', () => {
-  it('stages with tar and does not name build inputs individually', () => {
-    const code = stripComments(read('deploy.sh'));
-    expect(code).toMatch(/tar -cf -/);
-    // If someone reintroduces a per-file copy list, this is the tripwire.
+describe('deploy.sh stages the files git tracks', () => {
+  const code = stripComments(read('deploy.sh'));
+
+  it('derives the file list from git, not from a hand-written manifest', () => {
+    expect(code).toMatch(/git .*ls-files/);
+    // Tripwire against reintroducing a per-file copy list.
     expect(code).not.toMatch(/cp\s+vite\.config\.ts/);
   });
 
-  it('excludes nothing that vite.config.ts imports', () => {
-    const code = stripComments(read('deploy.sh'));
-    const excluded = [...code.matchAll(/--exclude=\.\/(\S+)/g)].map((m) => m[1]);
-    expect(excluded.length).toBeGreaterThan(0);
-    for (const file of [...localImportsOfViteConfig(), 'vite.config.ts', 'package.json', 'src', 'server']) {
-      expect(excluded, `deploy.sh excludes ${file}, which the build needs`).not.toContain(file);
-    }
+  // An exclude list fails OPEN. .gitignore hides .env.local, .env.production and
+  // friends because they hold secrets; an exclude list that forgets one copies it
+  // into ${APP_DIR}, silently. This was not hypothetical -- the exclude list
+  // briefly shipped in ac7676a staged a planted .env.local containing a secret.
+  // A forgotten include only breaks the deploy, loudly, before anything ships.
+  it('does not filter with a tar exclude list', () => {
+    expect(code, 'deploy.sh must not stage via an exclude list').not.toMatch(/--exclude=/);
   });
 
-  it('still excludes the things that must never ship or must be rebuilt', () => {
-    const code = stripComments(read('deploy.sh'));
-    const excluded = [...code.matchAll(/--exclude=\.\/(\S+)/g)].map((m) => m[1]);
-    for (const file of ['.git', 'node_modules', 'dist', '.env', 'data']) {
-      expect(excluded, `deploy.sh must exclude ${file}`).toContain(file);
-    }
+  it('refuses to run outside a git repository rather than staging blindly', () => {
+    expect(code).toMatch(/rev-parse --git-dir/);
+  });
+
+  it('handles paths with spaces or newlines', () => {
+    expect(code).toMatch(/ls-files -z/);
+    expect(code).toMatch(/tar --null -T -/);
   });
 
   it('swaps a staged tree into place instead of mutating the live install', () => {
-    const code = stripComments(read('deploy.sh'));
     expect(code).toMatch(/STAGE_DIR=/);
     // The old fossil list -- proof the destructive pre-copy wipe is gone.
     expect(code).not.toMatch(/rm -rf "\$\{APP_DIR\}\/server"/);
+  });
+});
+
+// Staging tracked files only is safe *because* the secrets are untracked. If a
+// .env ever became tracked, `git ls-files` would happily deploy it.
+describe('secrets stay untracked, which is what makes git ls-files safe', () => {
+  const tracked = execSync('git ls-files', { cwd: repoRoot }).toString().split('\n');
+
+  it.each(['.env', '.env.local', '.env.production', '.env.development.local'])(
+    '%s is not tracked',
+    (secret) => {
+      expect(tracked).not.toContain(secret);
+    },
+  );
+
+  it('no build artifact or dependency directory is tracked', () => {
+    expect(tracked.some((f) => f.startsWith('node_modules/'))).toBe(false);
+    expect(tracked.some((f) => f.startsWith('dist/'))).toBe(false);
+  });
+
+  it('every local import of vite.config.ts IS tracked, or the deploy cannot build', () => {
+    for (const file of localImportsOfViteConfig()) {
+      expect(tracked, `${file} is untracked; deploy.sh would not stage it`).toContain(file);
+    }
   });
 });
 

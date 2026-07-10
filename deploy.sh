@@ -113,28 +113,36 @@ rm -rf "${STAGE_DIR}"
 # APP_DIR is created for the .env step below; the swap replaces it wholesale.
 mkdir -p "${STAGE_DIR}" "${APP_DIR}"
 
-# Copy everything EXCEPT the excludes, rather than listing what to include.
+# Stage exactly the files git tracks.
 #
-# An include list fails closed against new files: adding build-id.ts at the repo
-# root and importing it from vite.config.ts broke this script, because nobody
-# remembered to extend the list. An exclude list fails open — a forgotten exclude
-# wastes disk, a forgotten include breaks the deploy. Prefer the harmless failure.
+# The original bug was not that the file list was an allowlist -- it was that the
+# allowlist was maintained by hand, so adding build-id.ts at the repo root broke
+# the build here. `git ls-files` is an allowlist that maintains itself.
+#
+# An exclude list was tried and reverted: it fails *open*. .gitignore hides
+# .env.local, .env.production and friends precisely because they hold secrets, and
+# an exclude list that forgets one copies it into ${APP_DIR} -- silently. A
+# forgotten include merely breaks the deploy, loudly, before anything ships. Loud
+# and broken beats quiet and leaking.
+#
+# Everything unwanted falls out for free, because none of it is tracked: .git,
+# node_modules, dist, data, every .env*, editor directories, logs.
 #
 # This also retires the old block of `rm -rf "${APP_DIR}/contexts"`-style lines:
 # each was a fossil of a past reorganization that stranded stale files on a live
 # install. A fresh staging directory cannot inherit them.
-tar -cf - \
-    --exclude=./.git \
-    --exclude=./node_modules \
-    --exclude=./dist \
-    --exclude=./data \
-    --exclude=./.env \
-    --exclude=./coverage \
-    --exclude=./.agents \
-    --exclude=./.github \
-    --exclude=./.claude \
-    --exclude=./docs \
-    . | tar -xf - -C "${STAGE_DIR}"
+#
+# -z / --null so paths containing spaces or newlines survive. Files are read from
+# the working tree, not from HEAD, preserving the previous behaviour of deploying
+# what is checked out rather than what is committed.
+if ! git -C "${REPO_ROOT}" rev-parse --git-dir >/dev/null 2>&1; then
+    print_error "Not a git repository. deploy.sh stages the files git tracks;"
+    print_error "run it from a clone, not from an extracted archive."
+    exit 1
+fi
+git -C "${REPO_ROOT}" ls-files -z \
+    | tar --null -T - -cf - \
+    | tar -xf - -C "${STAGE_DIR}"
 
 print_msg "Staged application files"
 
