@@ -757,3 +757,29 @@ describe('upstream 401 re-login', () => {
     expect(urls.some((u) => u.includes('/auth/login'))).toBe(true);
   });
 });
+
+describe('SPA fallback route', () => {
+  // The catch-all only registers when ./dist exists; test/setup.ts seeds a
+  // placeholder shell so this route is exercised in CI, where `npm test` runs
+  // before `npm run build`.
+  it('serves the app shell for a deep link', async () => {
+    const res = await request(app).get('/torrents/deep/link');
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/html/);
+  });
+
+  it('serves the app shell without requiring auth', async () => {
+    const res = await request(app).get('/settings');
+    expect(res.status).toBe(200);
+  });
+
+  // The fallback sits after the routes, so a regression in its path pattern
+  // could swallow unmatched /api requests and answer them with the HTML shell
+  // instead of a JSON 404 -- turning a blocked endpoint into a 200.
+  it('does not shadow the JSON 404 for unmatched API routes', async () => {
+    const res = await request(app).get('/api/v2/log/main').auth(...CREDS);
+    expect(res.status).toBe(404);
+    expect(res.headers['content-type']).toMatch(/json/);
+    expect(res.body).toEqual({ error: 'API endpoint not found' });
+  });
+});

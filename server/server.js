@@ -475,7 +475,10 @@ app.use('/api', (req, res) => {
 const distPath = path.join(__dirname, '..', 'dist');
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
-  app.get('*', (req, res) => {
+  // Regex, not '*': Express 5's path-to-regexp v8 rejects a bare '*' string,
+  // and its replacement ('/*splat') is not valid in Express 4. A RegExp means
+  // the same thing to both, so the SPA fallback survives the version bump.
+  app.get(/.*/, (req, res) => {
     res.sendFile(path.join(distPath, 'index.html'));
   });
   console.log(`Serving frontend from ${distPath}`);
