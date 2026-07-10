@@ -1,0 +1,43 @@
+version: 2
+
+updates:
+  # Keeps the workflow actions current. actions/checkout@v4 and
+  # setup-node@v4 silently aged into a Node 20 removal deadline; this is the
+  # mechanism that prevents a repeat.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  # Production dependencies are the only ones `npm audit --omit=dev` can flag,
+  # so they get their own ungrouped entry: a security bump arrives as one
+  # small, reviewable PR rather than buried in a batch.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    allow:
+      - dependency-type: production
+    open-pull-requests-limit: 5
+
+  # Dev dependencies cannot reach a deployed user. Batch them monthly to keep
+  # the noise down; majors are excluded because they break builds and deserve
+  # a deliberate change, not an automated one.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    allow:
+      - dependency-type: development
+    groups:
+      dev-dependencies:
+        patterns:
+          - '*'
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-major
+    open-pull-requests-limit: 3

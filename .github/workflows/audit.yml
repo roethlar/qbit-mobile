@@ -1,0 +1,29 @@
+name: Audit
+
+# Split out of the CI build job deliberately. A new advisory published
+# against an already-shipped dependency used to turn the next unrelated push
+# red, blaming a change that did not cause it and often cannot fix it. The
+# audit still runs and still fails loudly -- just on its own schedule, so the
+# signal reaches a maintainer instead of an innocent commit.
+#
+# Dependabot (.github/dependabot.yml) opens the corresponding fix PR.
+
+on:
+  schedule:
+    # Mondays, 07:00 UTC.
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # --omit=dev: only dependencies shipped to production are in the app's
+      # attack surface. A devDependency advisory does not reach a deployed user.
+      - run: npm audit --omit=dev --audit-level=high
