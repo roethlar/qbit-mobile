@@ -14,7 +14,6 @@ short and update it when important repo facts change.
   clean uninstall. See the Outcome section of
   `.agents/plans/deploy-macos-windows-hardening.md`.
 - Local `main` is ahead of `origin` (Gitea) and `github`, which are in sync with each
-  other at `b197735` (the 1.6.6 docs refresh) — as of commit `88f0780`, not yet pushed
   (push policy: ask first).
 - Version **1.6.6** remains what is deployed and verified in production (Linux,
   2026-07-10). Governance is at the AgentGovernanceBootstrap standard template
