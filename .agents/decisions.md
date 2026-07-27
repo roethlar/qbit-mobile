@@ -183,7 +183,7 @@ The two failure modes are not symmetric, and the tempting argument gets this bac
   happened once (`build-id.ts`, fixed in `bde77a7`).
 - An **exclude list** fails **silently**, and what it silently does is publish secrets.
   `.gitignore` ignores `.env`, `.env.local`, `.env.production` and the `.local` variants
-  because they hold credentials. An exclude list covering only `./.env` stages the rest.
+  because they hold credentials. An exclude list covering only `./.env` stages the rest. <!-- lint: allow (owner ruled leave-it, 2026-07-27: historical tar exclude token, not a live repo path) -->
   Demonstrated during the fix: with those files planted in a working tree, the `ac7676a`
   `tar` invocation staged a file containing `SECRET=hunter2` into the tree destined for
   `/opt/qbit-mobile`.
