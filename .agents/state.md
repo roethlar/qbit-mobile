@@ -5,6 +5,9 @@ short and update it when important repo facts change.
 
 ## Now
 
+- Axios was upgraded from 1.16.1 to 1.18.1 on 2026-07-27 in response to the
+  weekly production audit, and the app version is now **1.6.9**. The production
+  audit and the full automated verification suite pass.
 - The deploy-script hardening is now ported to **all three platforms**. 2026-07-10,
   commits `a16fd10` (macOS) and `88f0780` (Windows), version **1.6.8**: engines-derived
   Node floor, `git ls-files` staging, staged build + atomic swap, rollback on a failed
