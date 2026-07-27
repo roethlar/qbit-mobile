@@ -3,9 +3,10 @@
 Status: Drafted 2026-07-10, owner approved ("plan and fix"), all three slices landed
 the same day (`e676d08`, `ac7676a`, `9450415`).
 
-**Owner verification still outstanding:** no `sudo ./deploy.sh` run has exercised the
-staging swap, the rollback path, or the systemd interaction. Until it has, treat the
-atomic swap as designed-and-unit-tested, not proven.
+**Owner verification:** the normal `sudo ./deploy.sh` path was exercised in production
+on Linux on 2026-07-10 (version 1.6.6), proving the staging swap and systemd interaction.
+The forced failed-start rollback branch remains unverified on Linux; the equivalent
+macOS rollback branch was later exercised successfully.
 
 ## Why
 
@@ -101,11 +102,13 @@ destructive root script is worse than a known-brittle one. Recorded as follow-up
 
 ## Follow-ups
 
-- **Owner must run `sudo ./deploy.sh`.** The swap, rollback, and systemd paths are
-  unverified by automation. The rollback branch in particular has never executed.
-- `deploy-macos.sh` and `deploy.ps1` still carry the include list, the non-atomic copy,
-  and a hardcoded Node floor. `deploy.ps1`'s syntax is unverified — `pwsh` is not
-  installed on the development machine.
+- The forced failed-start rollback branch remains unverified on Linux. The normal
+  deploy, swap, and systemd paths ran successfully in production on 2026-07-10; the
+  equivalent macOS rollback branch was later exercised successfully.
+- Completed later in `a16fd10` and `88f0780`: `deploy-macos.sh` and `deploy.ps1` now
+  use git-derived staging, an atomic swap, and the engines-derived Node floor.
+  Windows runtime verification remains outstanding; see the Outcome in
+  `.agents/plans/deploy-macos-windows-hardening.md`.
 - The `${APP_DIR}.old.$$` tree doubles peak disk use during a deploy. Acceptable for this
   app; worth knowing if the install grows.
 

@@ -5,22 +5,8 @@ short and update it when important repo facts change.
 
 ## Now
 
-- Axios was upgraded from 1.16.1 to 1.18.1 on 2026-07-27 in response to the
-  weekly production audit, and the app version is now **1.6.9**. The production
-  audit and the full automated verification suite pass.
-- The deploy-script hardening is now ported to **all three platforms**. 2026-07-10,
-  commits `a16fd10` (macOS) and `88f0780` (Windows), version **1.6.8**: engines-derived
-  Node floor, `git ls-files` staging, staged build + atomic swap, rollback on a failed
-  start, uninstall sweeps `.stage`/`.old.*`. `deploy-macos.sh` was verified with real
-  runs on the Mac dev machine — fresh install, upgrade preserving `.env`/`data`, forced
-  build failure, and the rollback branch (its first execution on any platform), then a
-  clean uninstall. See the Outcome section of
-  `.agents/plans/deploy-macos-windows-hardening.md`.
-- Local `main` is ahead of `origin` (Gitea) and `github`, which are in sync with each
-  (push policy: ask first).
-- Version **1.6.6** remains what is deployed and verified in production (Linux,
-  2026-07-10). Governance is at the AgentGovernanceBootstrap standard template
-  (2026-07-02.1).
+- The last production deploy verified in repo records is version **1.6.6** on Linux
+  (2026-07-10).
 
 ## Next
 
@@ -39,10 +25,8 @@ short and update it when important repo facts change.
 
 ## Verification
 
-- Automated (mirrors the CI build job): `npm run lint`, `npm run typecheck`, `npm test`,
-  `npm run build`. See `.agents/repo-map.json` for the canonical command list.
-  `npm audit --omit=dev --audit-level=high` no longer runs in the build job; it has its
-  own weekly workflow (`.github/workflows/audit.yml`). See `.agents/decisions.md`.
+- Automated verification is defined in `.agents/repo-guidance.md`; see
+  `.agents/repo-map.json` for the canonical command list.
 - Behavior not covered by automation (the live UI against a running qBittorrent, the
   deploy/uninstall scripts) needs a manual check or an explicit note that it was not run.
 
@@ -52,12 +36,3 @@ short and update it when important repo facts change.
 - `.agents/repo-guidance.md`
 - `.agents/repo-map.json`
 - `.agents/decisions.md`
-
-## Unrecorded Repo Memory
-
-- The proxy's endpoint and field allowlists plus the fail-closed auth gate are a
-  deliberate security boundary; this is captured in `.agents/repo-guidance.md` and
-  `.agents/decisions.md`.
-- Files under `docs/` are dated review snapshots (2026-05-04) describing an older state of
-  the code (they say "React 18", "zero tests", "two API clients") and are kept as history,
-  not current truth.
