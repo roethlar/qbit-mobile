@@ -154,12 +154,22 @@ describe.each(GIT_STAGED_SCRIPTS)('%s reads the Node floor from package.json', (
 describe('engines.node stays in the form the deploy scripts can parse', () => {
   const enginesNode = (JSON.parse(read('package.json')) as { engines: { node: string } }).engines.node;
 
+  it('requires Node 24 or newer', () => {
+    expect(enginesNode).toBe('>=24.0.0');
+  });
+
   it('engines.node stays in the >=X.Y.Z form', () => {
     // The scripts abort rather than guess when this does not match. Changing
     // engines.node to e.g. "^20.19.0 || >=22.12.0" would break every deploy, so
     // fail here instead -- in CI, where it is cheap.
     const floor = /^>=(\d+)\.(\d+)/.exec(enginesNode);
     expect(floor, `engines.node "${enginesNode}" is not a plain >=X.Y[.Z] range`).not.toBeNull();
+  });
+});
+
+describe('CI exercises the supported Node floor and current even release', () => {
+  it('runs on Node 24 and 26', () => {
+    expect(read('.github/workflows/ci.yml')).toMatch(/node-version:\s*\[24,\s*26\]/);
   });
 });
 

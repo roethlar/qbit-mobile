@@ -51,23 +51,23 @@ and auth gate are what keep that exposure safe. Evidence: `server/server.js` (au
 exits at lines ~50 and ~57-63; `ALLOWED_SET_PREF_KEYS`), `server/routes/torrents.js`
 (`ALLOWED_ADD_FIELDS`), and the README "Notes on Compatibility and Security" section.
 
-### Node floor is 22.12 to match Vite 8 engines
+### Node floor is 24; CI exercises Node 24 and 26
 
-Status: Active
+Status: Active (revised by owner instruction 2026-07-27; supersedes the earlier
+22.12 floor and Node 22/24 matrix)
 
 Decision:
-The supported Node version is `>=22.12.0` (`package.json` `engines`). CI exercises both
-Node 22 (the declared floor) and Node 24 (Active LTS) via a build matrix.
+The supported Node version is `>=24.0.0` (`package.json` `engines`). CI exercises both
+Node 24 (the declared floor) and Node 26 via a build matrix. `deploy.sh`,
+`deploy-macos.sh`, and `deploy.ps1` derive and enforce the same floor from
+`package.json`.
 
 Reason:
-Vite 8 requires `^20.19.0 || >=22.12.0`; the floor was deliberately tightened to match
-(commit "Tighten Node floor to 22.12 to match Vite 8 engines"). Building or testing on
-older Node is unsupported.
-
-The floor stays at 22.12 rather than rising to 24: `deploy.sh`, `deploy-macos.sh`, and
-`deploy.ps1` each enforce 22.12+ at install time, so raising it would break self-hosted
-installs on a runtime that is still supported (Node 22 receives fixes until 2027-04-30).
-CI tests the floor as well as Active LTS so the `engines` claim is proven, not assumed.
+The earlier policy deferred this move until Node 26 entered LTS. The owner explicitly
+chose not to wait: maintaining Node 22 compatibility no longer justifies omitting Node
+26 from CI. Raising the floor is a breaking deployment-contract change, so it ships as
+version 2.0.0. CI still proves the declared floor rather than testing only the newest
+runtime, and the deploy scripts inherit the change without duplicating version literals.
 
 ### CI gates merges to main; the dependency audit runs separately
 
@@ -76,7 +76,7 @@ Status: Active. Supersedes the earlier form of this decision, in which
 
 Decision:
 `.github/workflows/ci.yml` runs lint, typecheck, test, and build on every push and pull
-request to `main`, across a Node 22/24 matrix. The production dependency audit
+request to `main`, across a Node 24/26 matrix. The production dependency audit
 (`npm audit --omit=dev --audit-level=high`) runs in its own workflow,
 `.github/workflows/audit.yml`, on a weekly schedule and on manual dispatch.
 `.github/dependabot.yml` tracks production deps, dev deps, and the workflow actions

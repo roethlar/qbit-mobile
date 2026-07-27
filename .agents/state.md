@@ -5,6 +5,9 @@ short and update it when important repo facts change.
 
 ## Now
 
+- Node.js 24 is now the supported floor and CI exercises Node 24/26. All three deploy
+  scripts inherit the floor from `package.json`; the breaking deployment-contract
+  change makes the app version **2.0.0**.
 - The last production deploy verified in repo records is version **1.6.6** on Linux
   (2026-07-10).
 
@@ -15,9 +18,6 @@ short and update it when important repo facts change.
   under a running task, rollback, post-swap ACL) cannot be exercised off-Windows.
 - Decide the open question in `.agents/decisions.md`: should a high-severity
   production advisory block a *release*, now that it no longer blocks a merge?
-- Deferred with a trigger, not a date: when Node 26 enters LTS (2026-10-28), move
-  the CI matrix to 24 + 26 and raise the `engines` floor and the three deploy
-  scripts' Node checks in the same change.
 
 ## Blockers
 

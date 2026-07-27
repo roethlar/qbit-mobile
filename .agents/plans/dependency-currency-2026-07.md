@@ -1,8 +1,9 @@
 # Plan: Dependency currency after the 2026-07 CI audit failure
 
 Status: Drafted 2026-07-10; approved and executed the same day. The Express 4 → 5
-migration below is **done** (`cc69364`, `1ceca1c`). What remains is the deferred Node
-item and the one open question at the end.
+migration below is **done** (`cc69364`, `1ceca1c`). The deferred Node item was executed
+early by owner instruction on 2026-07-27. What remains is the one open question at the
+end.
 
 ## Goal
 
@@ -125,13 +126,13 @@ exercised only through mocked axios in the test suite and through the proxy's ow
 404/401 paths in the smoke test. A real add-torrent round trip has not been run since
 the upgrade.
 
-## Deferred, with a trigger rather than a date
+## Node update executed early
 
-**Node.** CI runs 22 and 24. Node 24 leaves support 2028-04-30, about ten weeks before
-the two-year horizon; Node 22 leaves 2027-04-30, inside it. An end-of-life Node does not
-by itself turn CI red, so this is not urgent. Trigger: when Node 26 enters LTS
-(2026-10-28), move the matrix to 24 + 26 and drop 22 once the deploy scripts' floor is
-raised in the same change.
+The original trigger was Node 26 entering LTS on 2026-10-28. On 2026-07-27 the owner
+explicitly chose not to wait. The supported floor is now Node 24, CI exercises 24 and
+26, and all three deploy scripts inherit the floor from `package.json`. Because dropping
+Node 22 breaks the deployment contract for older hosts, the change ships as version
+2.0.0.
 
 ## Open question for the owner
 

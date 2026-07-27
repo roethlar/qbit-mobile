@@ -45,7 +45,7 @@ it for approval and keep the README's security section in sync. See
 
 The current automated checks mirror the CI build job (`.github/workflows/ci.yml`):
 `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`. CI runs on push
-and pull request to `main`, across a Node 22/24 matrix. The production dependency
+and pull request to `main`, across a Node 24/26 matrix. The production dependency
 audit (`npm audit --omit=dev --audit-level=high`) runs separately, weekly, in
 `.github/workflows/audit.yml` — see `.agents/decisions.md` for why. See
 `.agents/repo-map.json` for the canonical, per-project command list.

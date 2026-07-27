@@ -5,6 +5,14 @@ All notable changes to this project are documented here. The format follows
 versioning: patch for fixes and dependency bumps, minor for new user-visible capability,
 major for breaking changes to deployment, configuration, or the app's contract.
 
+## [2.0.0] - 2026-07-27
+
+### Changed
+
+- **Node.js 24 is now the minimum supported runtime.** CI exercises Node 24 and 26,
+  and all three deployment scripts enforce the same floor from `package.json`.
+  Deployments still running Node 22 must upgrade Node before upgrading qBit Mobile.
+
 ## [1.6.6] - 2026-07-10
 
 A dependency, supply-chain, and deploy-safety release. No breaking changes to
@@ -60,3 +68,4 @@ instance on Linux.
 See the Git history and the GitHub releases page.
 
 [1.6.6]: https://github.com/roethlar/qbit-mobile/releases/tag/v1.6.6
+[2.0.0]: https://github.com/roethlar/qbit-mobile/compare/v1.6.6...v2.0.0
