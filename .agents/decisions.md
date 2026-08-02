@@ -132,7 +132,7 @@ unmodified — the standing check for any future Express upgrade is that they co
 Status: Active (adopted 2026-07-10, commit `cc69364`)
 
 Decision:
-`test/setup.ts` seeds a placeholder `dist/index.html` when none exists.
+`test/setup.ts` seeds a placeholder `dist/index.html` when none exists. <!-- lint: allow (owner ruled, 2026-08-02: gitignored test placeholder seeded by test/setup.ts; not a committed path) -->
 
 Reason:
 `server/server.js` registers `express.static` and the SPA fallback only when `./dist`
