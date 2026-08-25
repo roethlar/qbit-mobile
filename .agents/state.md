@@ -24,8 +24,9 @@ short and update it when important repo facts change.
   (2026-07-10).
 - The high-severity `ip-address` advisories (SSRF/trust-boundary, reached via
   `express-rate-limit`) are fixed by the lockfile bump to 10.5.0, committed as
-  **2.0.1** (2026-08-17). The GitHub mirror's weekly audit keeps failing until
-  that commit is pushed there.
+  **2.0.1** (2026-08-17). `origin` and the `github` mirror both carry it (and
+  2.1.0/2.1.1) as of 2026-08-25, so the mirror's weekly audit should go green on
+  its next run.
 
 ## Next
 
@@ -34,9 +35,6 @@ short and update it when important repo facts change.
   under a running task, rollback, post-swap ACL) cannot be exercised off-Windows.
 - Decide the open question in `.agents/decisions.md`: should a high-severity
   production advisory block a *release*, now that it no longer blocks a merge?
-- Push `main` to `origin` and the `github` mirror (the mirror is also two commits
-  behind from before the 2.0.1 audit fix). Push policy is ask-first; awaiting an
-  owner go.
 
 ## Blockers
 
