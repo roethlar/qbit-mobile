@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Folder, Check } from 'lucide-react';
-import { clsx } from 'clsx';
 import { BottomSheet } from './Layout';
+import { LocationPresetList } from './LocationPresetList';
 import { useLocationPresets } from '../hooks/useLocationPresets';
 
 interface MoveLocationSheetProps {
@@ -73,52 +72,14 @@ export function MoveLocationSheet({
           </div>
         )}
 
-        {presets.data && presets.data.length > 0 && (
-          <div>
-            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
-              Presets
-            </p>
-            <ul className="space-y-1">
-              {presets.data.map((p) => (
-                <li key={`${p.name}=${p.path}`}>
-                  <button
-                    onClick={() => {
-                      setSelectedPreset(p.path);
-                      setCustomPath('');
-                    }}
-                    className={clsx(
-                      'w-full flex items-center gap-2 p-2 rounded-lg text-left transition-colors',
-                      selectedPreset === p.path
-                        ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
-                        : 'bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-gray-200 active:bg-gray-100 dark:active:bg-gray-600',
-                    )}
-                  >
-                    <Folder className="w-4 h-4 flex-shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate">{p.name}</p>
-                      <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
-                        {p.path}
-                      </p>
-                    </div>
-                    {selectedPreset === p.path && (
-                      <Check className="w-4 h-4 flex-shrink-0" />
-                    )}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {presets.isLoading && (
-          <p className="text-xs text-gray-500 dark:text-gray-400">Loading presets…</p>
-        )}
-
-        {presets.isError && (
-          <p className="text-xs text-red-600 dark:text-red-400">
-            Couldn't load preset list — type a path below to continue.
-          </p>
-        )}
+        <LocationPresetList
+          heading="Presets"
+          selectedPath={selectedPreset}
+          onSelect={(path) => {
+            setSelectedPreset(path);
+            setCustomPath('');
+          }}
+        />
 
         <div>
           <label

@@ -5,6 +5,9 @@ short and update it when important repo facts change.
 
 ## Now
 
+- The Add Torrent sheet's Save Path now offers the same location presets as the
+  move sheet (shared `src/components/LocationPresetList.tsx`), shipped as **2.1.0**
+  (2026-08-25).
 - Node.js 24 is now the supported floor and CI exercises Node 24/26. All three deploy
   scripts inherit the floor from `package.json`; the breaking deployment-contract
   change makes the app version **2.0.0**.
@@ -17,6 +20,15 @@ short and update it when important repo facts change.
 
 ## Next
 
+- **Fix `BottomSheet` focus stealing** (`src/components/Layout.tsx`, found 2026-08-25
+  while testing 2.1.0). Its open/close effect depends on `[isOpen, onClose]` and calls
+  `containerRef.current.focus()` on every run; `AddTorrent` passes a fresh `handleClose`
+  each render, so every keystroke inside the Add Torrent sheet re-runs the effect and
+  moves focus off the field — in jsdom `user.type` delivers only the first character
+  (`AddTorrent.test.tsx` uses `fireEvent.change` to sidestep it). Proposed fix: hold
+  `onClose` in a ref so the effect depends on `isOpen` only, then switch the test back
+  to `user.type` as the regression check. Needs an owner go; not yet reproduced on a
+  real device.
 - **Owner run of `deploy.ps1` on Windows.** The rewrite parses clean under pwsh 7.6 and
   its staging loop was executed verbatim on macOS, but the Scheduled Task paths (swap
   under a running task, rollback, post-swap ACL) cannot be exercised off-Windows.

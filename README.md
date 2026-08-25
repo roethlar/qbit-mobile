@@ -143,6 +143,8 @@ Both settings are optional and only matter for specific deployments — leave th
 
 The "Move" action in the row expansion lets you change a torrent's save path (and physically move the downloaded files). The same "Move" sits in the bulk-select toolbar for multi-torrent relocations.
 
+The same presets appear in the Add Torrent sheet under Save Path, so a new torrent can land in the right place from the start instead of being moved afterwards.
+
 Presets are managed from the Settings page → "Move-to Presets" card: add a row, fill in Name and Path, hit Save. Changes persist to `data/locations.json` in the install directory.
 
 For a first-boot seed before anyone has touched the Settings page, set `DOWNLOAD_LOCATIONS` in `.env`:

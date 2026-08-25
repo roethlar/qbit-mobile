@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { Upload, Link, X } from 'lucide-react';
 import { BottomSheet } from './Layout';
+import { LocationPresetList } from './LocationPresetList';
 
 interface AddTorrentProps {
   isOpen: boolean;
@@ -205,6 +206,13 @@ function TorrentOptions({ options, onChange }: TorrentOptionsProps) {
             <label htmlFor="savepath" className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
               Save Path (optional)
             </label>
+            {/* Same presets the move sheet offers, so a long target path is a tap
+                rather than typed (or fixed up with a move after the fact). */}
+            <LocationPresetList
+              className="mb-2"
+              selectedPath={options.savepath || null}
+              onSelect={(path) => updateOption('savepath', path)}
+            />
             <input
               id="savepath"
               type="text"
