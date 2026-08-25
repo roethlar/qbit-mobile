@@ -7,7 +7,10 @@ short and update it when important repo facts change.
 
 - The Add Torrent sheet's Save Path now offers the same location presets as the
   move sheet (shared `src/components/LocationPresetList.tsx`), shipped as **2.1.0**
-  (2026-08-25).
+  (2026-08-25). Reviewed: codereview codex (gpt-5.6-sol @ max, standard, inline
+  session-only model) over `bd689a8..3b34a9e`, 2026-08-25, MCP transport, thread
+  `01a039af-7266-79a2-931c-7ed2d53b5d9f`: clean — no material issue. The MCP
+  envelope carries no resolved model id; the line records the model as dispatched.
 - Node.js 24 is now the supported floor and CI exercises Node 24/26. All three deploy
   scripts inherit the floor from `package.json`; the breaking deployment-contract
   change makes the app version **2.0.0**.
