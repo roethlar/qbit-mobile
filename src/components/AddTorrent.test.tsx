@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 const useLocationPresets = vi.fn();
@@ -17,14 +17,6 @@ function renderSheet(onAddUrl: (url: string, options?: unknown) => Promise<void>
   return render(
     <AddTorrent isOpen onClose={() => undefined} onAddUrl={onAddUrl} onAddFile={noop} />,
   );
-}
-
-// Text entry uses fireEvent.change rather than user.type: BottomSheet refocuses
-// its container whenever the sheet re-renders with a new onClose identity
-// (Layout.tsx), which drops every keystroke after the first. Tracked as a
-// separate finding; switch back to user.type once it is fixed.
-function setValue(el: HTMLElement, value: string) {
-  fireEvent.change(el, { target: { value } });
 }
 
 describe('AddTorrent save path presets', () => {
@@ -62,7 +54,9 @@ describe('AddTorrent save path presets', () => {
     await user.click(screen.getByRole('button', { name: /movies/i }));
     expect(savepath.value).toBe('/mnt/movies');
 
-    setValue(screen.getByLabelText(/torrent url or magnet link/i), MAGNET);
+    // Typed keystroke by keystroke on purpose: each one re-renders the sheet,
+    // which is the path that used to drop focus (see BottomSheet in Layout.tsx).
+    await user.type(screen.getByLabelText(/torrent url or magnet link/i), MAGNET);
     await user.click(screen.getByRole('button', { name: /^add torrent$/i }));
 
     await waitFor(() => {
@@ -87,10 +81,10 @@ describe('AddTorrent save path presets', () => {
     const savepath = screen.getByLabelText(/save path/i) as HTMLInputElement;
 
     await user.click(screen.getByRole('button', { name: /movies/i }));
-    setValue(savepath, '/mnt/movies/2024');
+    await user.type(savepath, '/2024');
     expect(savepath.value).toBe('/mnt/movies/2024');
 
-    setValue(screen.getByLabelText(/torrent url or magnet link/i), MAGNET);
+    await user.type(screen.getByLabelText(/torrent url or magnet link/i), MAGNET);
     await user.click(screen.getByRole('button', { name: /^add torrent$/i }));
 
     await waitFor(() => {

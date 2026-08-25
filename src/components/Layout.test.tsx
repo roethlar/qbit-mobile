@@ -1,6 +1,44 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { Header } from './Layout';
+import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
+import { BottomSheet, Header } from './Layout';
+
+// Mirrors AddTorrent: field state lives above the sheet, and the sheet gets
+// a fresh onClose on every render.
+function TypingSheet({ onClose }: { onClose: (value: string) => void }) {
+  const [value, setValue] = useState('');
+  return (
+    <BottomSheet isOpen onClose={() => onClose(value)}>
+      <label htmlFor="field">Field</label>
+      <input id="field" value={value} onChange={(e) => setValue(e.target.value)} />
+    </BottomSheet>
+  );
+}
+
+describe('BottomSheet', () => {
+  it('keeps focus in a field while typing re-renders the sheet with a new onClose', async () => {
+    render(<TypingSheet onClose={() => undefined} />);
+    const user = userEvent.setup();
+    const field = screen.getByLabelText('Field') as HTMLInputElement;
+
+    await user.type(field, '/mnt/movies');
+
+    expect(field.value).toBe('/mnt/movies');
+    expect(document.activeElement).toBe(field);
+  });
+
+  it('Escape calls the latest onClose, not the one captured when the sheet opened', async () => {
+    const onClose = vi.fn();
+    render(<TypingSheet onClose={onClose} />);
+    const user = userEvent.setup();
+
+    await user.type(screen.getByLabelText('Field'), 'abc');
+    await user.keyboard('{Escape}');
+
+    expect(onClose).toHaveBeenCalledWith('abc');
+  });
+});
 
 describe('Header', () => {
   it('renders the title', () => {

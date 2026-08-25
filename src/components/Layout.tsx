@@ -107,6 +107,17 @@ interface BottomSheetProps {
 export function BottomSheet({ isOpen, onClose, title, children }: BottomSheetProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
 
+  // Callers routinely pass a fresh onClose on every render (AddTorrent's
+  // handleClose, inline arrows in parents). The open/close effect below must
+  // therefore not depend on it: re-running the effect refocuses the container,
+  // which steals focus from whatever field the user is typing in — every
+  // keystroke re-rendered the sheet, so only the first one landed. Read the
+  // latest onClose through a ref at event time instead.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   useEffect(() => {
     if (!isOpen) return;
     const previouslyFocused = document.activeElement as HTMLElement | null;
@@ -115,7 +126,7 @@ export function BottomSheet({ isOpen, onClose, title, children }: BottomSheetPro
     containerRef.current?.focus();
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (containerRef.current) trapTabKey(containerRef.current, e);
@@ -130,7 +141,7 @@ export function BottomSheet({ isOpen, onClose, title, children }: BottomSheetPro
       // were when the sheet opened.
       previouslyFocused?.focus?.();
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
