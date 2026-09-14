@@ -96,7 +96,7 @@ and the existing audit workflow policy.
 | Dependency group | Minimum patched version | Result |
 | --- | --- | --- |
 | js-yaml | 4.3.2 | Updated 4.3.1 -> 4.3.2 in 2.1.4; all checks pass; six affected packages remain |
-| fast-uri | 3.1.6 | Pending |
+| fast-uri | 3.1.6 | Updated 3.1.5 -> 3.1.7 in 2.1.5; all checks pass; five affected packages remain |
 | baseline-browser-mapping | 2.11.0 | Pending |
 | browserslist | 4.28.7 | Pending |
 | postcss-selector-parser | 6.1.3 | Pending |
