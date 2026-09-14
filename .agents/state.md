@@ -6,8 +6,8 @@ short and update it when important repo facts change.
 ## Now
 
 - The owner expanded the 2026-09-14 remediation to **every audit and test**.
-  Local version **2.1.6** patches js-yaml, fast-uri, and baseline-browser-mapping;
-  four affected packages remain in the full audit. Clean install and all repository
+  Local version **2.1.7** also patches Browserslist; three affected packages
+  remain in the full audit, with zero high findings. Clean install and all repository
   checks pass. Canonical scope, checklist,
   and per-dependency results: `.agents/plans/dependency-audit-2026-09.md`.
 - The 2026-09-14 GitHub audit failure is fixed and published as **2.1.3**. Multer 2.3.0

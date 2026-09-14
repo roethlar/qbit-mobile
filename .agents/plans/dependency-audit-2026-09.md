@@ -98,13 +98,19 @@ and the existing audit workflow policy.
 | js-yaml | 4.3.2 | Updated 4.3.1 -> 4.3.2 in 2.1.4; all checks pass; six affected packages remain |
 | fast-uri | 3.1.6 | Updated 3.1.5 -> 3.1.7 in 2.1.5; all checks pass; five affected packages remain |
 | baseline-browser-mapping | 2.11.0 | Updated 2.10.30 -> 2.11.23 in 2.1.6; all checks pass; four affected packages remain |
-| browserslist | 4.28.7 | Pending |
+| browserslist | 4.28.7 | Updated 4.28.2 -> 4.28.9 with required browser datasets in 2.1.7; all checks pass; three affected packages remain |
 | postcss-selector-parser | 6.1.3 | Pending |
 | vitest and @vitest/mocker | 4.1.11 | Pending |
 
 For completed rows, "all checks pass" means `npm ci`, lint, typecheck, all 176
 tests, and production build on Node 26.8.2/npm 12.0.2. Remaining package counts
 come from a fresh full `npm audit` after that slice.
+
+During the Browserslist slice, one local test invocation returned failure, but
+the PTK exception response did not retain the test diagnostic. A direct rerun
+passed all 176 tests, and a subsequent clean install plus all four checks also
+passed. Cause is unverified; no test or guard was disabled. Final GitHub matrix
+verification remains required.
 
 Completion requires all of the following on the final dependency tree:
 
