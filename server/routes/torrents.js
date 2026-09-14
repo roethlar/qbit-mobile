@@ -10,6 +10,8 @@ const upload = multer({
     fileSize: 10 * 1024 * 1024,
     files: 25,
     fields: 30,
+    // Upload fields are flat; bound bracket indices before Multer builds arrays.
+    fieldArrayIndexLimit: 0,
   },
 });
 

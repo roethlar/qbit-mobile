@@ -648,6 +648,19 @@ describe('POST /torrents/add (multipart)', () => {
     expect(body).not.toContain('autorun_program');
   });
 
+  it('rejects indexed multipart fields before forwarding upstream', async () => {
+    const res = await request(app)
+      .post('/api/v2/torrents/add')
+      .auth(...CREDS)
+      // A small index proves the bound without risking a huge sparse array
+      // if this regression is run against the vulnerable configuration.
+      .field('ignored[1]', 'value')
+      .field('ignored[key]', 'value');
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('LIMIT_FIELD_ARRAY_INDEX');
+    expect(axiosMock).not.toHaveBeenCalled();
+  });
+
   it('qB5 path forwards stopped=true as stopped=true', async () => {
     const res = await request(app)
       .post('/api/v2/torrents/add')
