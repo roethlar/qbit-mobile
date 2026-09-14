@@ -97,7 +97,7 @@ and the existing audit workflow policy.
 | --- | --- | --- |
 | js-yaml | 4.3.2 | Updated 4.3.1 -> 4.3.2 in 2.1.4; all checks pass; six affected packages remain |
 | fast-uri | 3.1.6 | Updated 3.1.5 -> 3.1.7 in 2.1.5; all checks pass; five affected packages remain |
-| baseline-browser-mapping | 2.11.0 | Pending |
+| baseline-browser-mapping | 2.11.0 | Updated 2.10.30 -> 2.11.23 in 2.1.6; all checks pass; four affected packages remain |
 | browserslist | 4.28.7 | Pending |
 | postcss-selector-parser | 6.1.3 | Pending |
 | vitest and @vitest/mocker | 4.1.11 | Pending |
