@@ -1,6 +1,7 @@
 # September 2026 dependency audit remediation
 
-Status: Complete, published and verified on GitHub, 2026-09-14.
+Status: Production remediation published; full audit remediation in progress,
+2026-09-14.
 Scope authorized by the owner's instruction to investigate and remediate the
 failed GitHub audit.
 
@@ -73,7 +74,56 @@ that audit and the Node 24/26 CI matrix pass.
 - Deployment was not performed. Pre-existing untracked `.agents/machines.md`
   and `.agents/plans/repo-review-fixes-2026-07.md` were left untouched.
 
-## Follow-up: development dependency alerts
+## Expanded scope: every audit and test
+
+On 2026-09-14 the owner instructed: "do not stop until this passes every audit
+and test." This expands the remediation to development dependencies and includes
+publication and GitHub verification under the existing push authorization.
+
+Baseline: local HEAD and both remote main refs matched `873f0fd`. Full `npm audit`
+failed on seven packages (three high, three moderate, one low), while the
+production audit was clean. Inspecting package scripts, both GitHub workflows,
+and all test/config files identifies the automated acceptance checks below.
+
+Implementation: update the six affected dependency groups in separate commits,
+using patched releases within their current compatible ranges. Keep the Vitest
+packages on a matching version. Inspect each lockfile diff and run the repository
+lint, typecheck, tests, and build before committing. Use the audit to verify each
+finding disappears; no new tests are needed for these upstream dependency fixes.
+Patch-bump the app with each dependency slice. Preserve auth, allowlists, tests,
+and the existing audit workflow policy.
+
+| Dependency group | Minimum patched version | Result |
+| --- | --- | --- |
+| js-yaml | 4.3.2 | Updated 4.3.1 -> 4.3.2 in 2.1.4; all checks pass; six affected packages remain |
+| fast-uri | 3.1.6 | Pending |
+| baseline-browser-mapping | 2.11.0 | Pending |
+| browserslist | 4.28.7 | Pending |
+| postcss-selector-parser | 6.1.3 | Pending |
+| vitest and @vitest/mocker | 4.1.11 | Pending |
+
+For completed rows, "all checks pass" means `npm ci`, lint, typecheck, all 176
+tests, and production build on Node 26.8.2/npm 12.0.2. Remaining package counts
+come from a fresh full `npm audit` after that slice.
+
+Completion requires all of the following on the final dependency tree:
+
+- `npm ci` succeeds from the committed lockfile.
+- `npm audit --audit-level=low` and the existing production audit both report
+  zero vulnerabilities, including development/optional dependencies.
+- `npm run lint`, `npm run typecheck`, `npm test`, and `npm run build` pass.
+- GitHub CI passes on Node 24 and 26, and the dispatched Audit workflow passes.
+- The GitHub Dependabot API reports zero open alerts after its dependency graph
+  refresh; no alert is dismissed to satisfy this requirement.
+- Both remotes contain the verified fixes and the repository record is current.
+
+Live qBittorrent and deployment are not automated audit/test entry points and
+will not be invoked as part of these dependency fixes. The referenced
+`.agents/repo-map.json` is absent from this checkout and Git; the explicit
+Verification commands in `.agents/repo-guidance.md` match CI and are the verified
+entry points used here.
+
+## Development dependency evidence at scope expansion
 
 After publication, the GitHub Dependabot API reported 10 open alerts, all marked
 development scope. These were outside the production audit that failed. As of
@@ -84,5 +134,4 @@ development scope. These were outside the production audit that failed. As of
 - Low: postcss-selector-parser (#34).
 
 Source: [repository Dependabot alerts](https://github.com/roethlar/qbit-mobile/security/dependabot).
-Recommended next action: assess applicability and prepare targeted updates for
-these development dependencies. No changes to them were made in this remediation.
+The expanded scope above now covers remediation of these development dependencies.

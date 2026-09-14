@@ -5,6 +5,10 @@ short and update it when important repo facts change.
 
 ## Now
 
+- The owner expanded the 2026-09-14 remediation to **every audit and test**.
+  Local version **2.1.4** patches js-yaml; six affected packages remain in the
+  full audit. Clean install and all repository checks pass. Canonical scope, checklist,
+  and per-dependency results: `.agents/plans/dependency-audit-2026-09.md`.
 - The 2026-09-14 GitHub audit failure is fixed and published as **2.1.3**. Multer 2.3.0
   plus an explicit multipart field array-index limit fixes the high-severity
   findings (2.1.2, `9d9d0e2`); qs 6.16.0 fixes the moderate findings
@@ -35,9 +39,8 @@ short and update it when important repo facts change.
 
 ## Next
 
-- Triage the 10 remaining GitHub Dependabot alerts, all marked development scope
-  (6 high, 3 medium, 1 low). Details in `.agents/plans/dependency-audit-2026-09.md`;
-  these were not findings in the failed production audit.
+- Complete the full dependency audit remediation, then publish and verify zero
+  npm vulnerabilities, passing Node 24/26 CI, and zero open Dependabot alerts.
 - **Owner run of `deploy.ps1` on Windows.** The rewrite parses clean under pwsh 7.6 and
   its staging loop was executed verbatim on macOS, but the Scheduled Task paths (swap
   under a running task, rollback, post-swap ACL) cannot be exercised off-Windows.
