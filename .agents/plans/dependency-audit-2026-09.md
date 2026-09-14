@@ -1,7 +1,8 @@
 # September 2026 dependency audit remediation
 
-Status: In progress, 2026-09-14. Scope authorized by the owner's instruction to
-investigate and remediate the failed GitHub audit.
+Status: Remediated and verified locally, 2026-09-14. Publication awaits approval.
+Scope authorized by the owner's instruction to investigate and remediate the
+failed GitHub audit.
 
 ## Evidence
 
@@ -49,9 +50,19 @@ that audit and the Node 24/26 CI matrix pass.
 
 ## Results
 
-- Multer slice complete locally as 2.1.2: dependency 2.3.0 plus explicit
+- Multer slice committed as `9d9d0e2` (2.1.2): dependency 2.3.0 plus explicit
   `fieldArrayIndexLimit: 0`. On Node 26.8.2/npm 12.0.2, clean install, lint,
   typecheck, 176 tests, and build passed. The new regression returned 200 instead
   of 400 when the limit was temporarily removed, then passed after restoration.
   Production audit exits zero at the high threshold with only qs (moderate)
   remaining. No live qBittorrent or deployment check was run.
+- qs slice complete locally as 2.1.3: qs 6.15.2 -> 6.16.0 and its required
+  side-channel 1.1.0 -> 1.1.1. No other package versions changed. On Node
+  26.8.2/npm 12.0.2, `npm ci`, lint, typecheck, all 176 tests, build, and
+  `npm audit --omit=dev --audit-level=high` passed; the audit reports zero
+  vulnerabilities. `npm ls multer qs --all` confirms Multer 2.3.0 and one
+  deduplicated qs 6.16.0 used by Express, body-parser, and Superagent.
+- GitHub rerun, Node 24 verification, and deployment have not been performed.
+  Both remote main refs were `2d380ff` at startup; the fixed commits are local
+  until publication is approved. Pre-existing untracked `.agents/machines.md`
+  and `.agents/plans/repo-review-fixes-2026-07.md` were left untouched.
