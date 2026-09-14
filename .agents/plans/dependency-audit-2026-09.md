@@ -1,7 +1,7 @@
 # September 2026 dependency audit remediation
 
-Status: Full audit remediation verified locally; publication and GitHub
-verification in progress, 2026-09-14.
+Status: Complete. All dependency audits, automated tests, and GitHub checks
+passed; fixes published to both remotes, 2026-09-14.
 Scope authorized by the owner's instruction to investigate and remediate the
 failed GitHub audit.
 
@@ -110,7 +110,7 @@ During the Browserslist slice, one local test invocation returned failure, but
 the PTK exception response did not retain the test diagnostic. A direct rerun
 passed all 176 tests, and a subsequent clean install plus all four checks also
 passed. Cause is unverified; no test or guard was disabled. Final GitHub matrix
-verification remains required.
+verification subsequently passed all 176 tests on both Node 24 and Node 26.
 
 Final local results for 2.1.9: clean installation, lint, typecheck, 176 tests,
 and build passed. Both `npm audit --audit-level=low` and
@@ -119,6 +119,30 @@ vulnerabilities. `npm ls` confirms patched versions throughout the affected
 dependency tree. Only dependency manifests/lockfile and `.agents/` records
 changed in the expanded remediation; no application code, tests, or CI gates
 were changed.
+
+## Final completion evidence
+
+Verified on 2026-09-14 against code commit `78cd9e3` (2.1.9):
+
+- `npm ci`, lint, typecheck, all 176 tests in 13 files, and build passed locally.
+  Both configured Vitest projects (Node and UI) ran; no tests were skipped.
+- Full `npm audit --audit-level=low`: zero vulnerabilities, exit 0.
+- Production `npm audit --omit=dev --audit-level=high`: zero vulnerabilities,
+  exit 0.
+- [GitHub CI](https://github.com/roethlar/qbit-mobile/actions/runs/34854405287):
+  both Node 24 and Node 26 jobs completed successfully. Each ran clean install,
+  lint, typecheck, all 176 tests, and build; both install logs also report zero
+  vulnerabilities.
+- [GitHub Audit](https://github.com/roethlar/qbit-mobile/actions/runs/34854404826):
+  completed successfully; both install and production audit report zero
+  vulnerabilities.
+- GitHub Dependabot API (`state=open`): `[]`, zero open alerts after the push.
+  Alerts closed from the dependency updates; no alerts were dismissed.
+- `git ls-remote` verified both origin/main and github/main at `78cd9e3`.
+  The six development dependency fixes are separate commits, each with its
+  version bump and verification record. `git diff --check` passes.
+- No deployment or live qBittorrent check was performed. The pre-existing
+  untracked files remain untouched.
 
 Completion requires all of the following on the final dependency tree:
 

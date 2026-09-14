@@ -5,21 +5,14 @@ short and update it when important repo facts change.
 
 ## Now
 
-- The owner expanded the 2026-09-14 remediation to **every audit and test**.
-  Local version **2.1.9** fixes all remaining development dependency findings.
-  Full and production npm audits report zero vulnerabilities. Clean install,
-  lint, typecheck, all 176 tests, and build pass. Publication and GitHub
-  verification are in progress. Canonical scope, checklist,
-  and per-dependency results: `.agents/plans/dependency-audit-2026-09.md`.
-- The 2026-09-14 GitHub audit failure is fixed and published as **2.1.3**. Multer 2.3.0
-  plus an explicit multipart field array-index limit fixes the high-severity
-  findings (2.1.2, `9d9d0e2`); qs 6.16.0 fixes the moderate findings
-  (2.1.3, `9dd7bba`). Both fixes are on origin and the GitHub mirror.
-  Clean install, lint, typecheck, all 176 tests, and build pass on Node 26.8.2;
-  the production audit reports zero vulnerabilities. The new upload regression
-  fails with the limit removed and passes restored. GitHub Audit run 34852542409
-  and CI run 34852543339 (Node 24/26) passed on `9dd7bba`. Neither fix is deployed.
-  Evidence and the remaining development dependency alerts:
+- The 2026-09-14 audit remediation is complete and published as **2.1.9**
+  (`78cd9e3`) to origin and the GitHub mirror. Full and production npm audits
+  report zero vulnerabilities, including development dependencies. GitHub
+  Dependabot reports zero open alerts. Clean install, lint, typecheck, all 176
+  tests, and build pass locally and in GitHub CI on Node 24/26 (run 34854405287);
+  the GitHub Audit passed (run 34854404826). Tests and audit gates were preserved.
+  This includes the earlier Multer update plus multipart array-index limit and
+  qs update. No deployment was performed. Canonical scope and verification:
   `.agents/plans/dependency-audit-2026-09.md`.
 - `BottomSheet` (`src/components/Layout.tsx`) no longer steals focus on re-render:
   its open/close effect depended on `onClose`, which callers pass fresh every render,
@@ -41,8 +34,6 @@ short and update it when important repo facts change.
 
 ## Next
 
-- Complete the full dependency audit remediation, then publish and verify zero
-  npm vulnerabilities, passing Node 24/26 CI, and zero open Dependabot alerts.
 - **Owner run of `deploy.ps1` on Windows.** The rewrite parses clean under pwsh 7.6 and
   its staging loop was executed verbatim on macOS, but the Scheduled Task paths (swap
   under a running task, rollback, post-swap ACL) cannot be exercised off-Windows.
