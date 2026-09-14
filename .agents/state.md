@@ -5,13 +5,15 @@ short and update it when important repo facts change.
 
 ## Now
 
-- The 2026-09-14 GitHub audit failure is fixed locally as **2.1.3**. Multer 2.3.0
+- The 2026-09-14 GitHub audit failure is fixed and published as **2.1.3**. Multer 2.3.0
   plus an explicit multipart field array-index limit fixes the high-severity
-  findings (2.1.2, `9d9d0e2`); qs 6.16.0 fixes the moderate findings (2.1.3).
+  findings (2.1.2, `9d9d0e2`); qs 6.16.0 fixes the moderate findings
+  (2.1.3, `9dd7bba`). Both fixes are on origin and the GitHub mirror.
   Clean install, lint, typecheck, all 176 tests, and build pass on Node 26.8.2;
   the production audit reports zero vulnerabilities. The new upload regression
-  fails with the limit removed and passes restored. Publication and GitHub
-  verification await owner approval. Evidence and remaining work:
+  fails with the limit removed and passes restored. GitHub Audit run 34852542409
+  and CI run 34852543339 (Node 24/26) passed on `9dd7bba`. Neither fix is deployed.
+  Evidence and the remaining development dependency alerts:
   `.agents/plans/dependency-audit-2026-09.md`.
 - `BottomSheet` (`src/components/Layout.tsx`) no longer steals focus on re-render:
   its open/close effect depended on `onClose`, which callers pass fresh every render,
@@ -33,8 +35,9 @@ short and update it when important repo facts change.
 
 ## Next
 
-- Obtain approval to push the audit fixes to both remotes, then dispatch/verify
-  the GitHub Audit workflow and Node 24/26 CI matrix. Neither fix is deployed.
+- Triage the 10 remaining GitHub Dependabot alerts, all marked development scope
+  (6 high, 3 medium, 1 low). Details in `.agents/plans/dependency-audit-2026-09.md`;
+  these were not findings in the failed production audit.
 - **Owner run of `deploy.ps1` on Windows.** The rewrite parses clean under pwsh 7.6 and
   its staging loop was executed verbatim on macOS, but the Scheduled Task paths (swap
   under a running task, rollback, post-swap ACL) cannot be exercised off-Windows.

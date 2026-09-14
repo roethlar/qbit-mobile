@@ -1,6 +1,6 @@
 # September 2026 dependency audit remediation
 
-Status: Remediated and verified locally, 2026-09-14. Publication awaits approval.
+Status: Complete, published and verified on GitHub, 2026-09-14.
 Scope authorized by the owner's instruction to investigate and remediate the
 failed GitHub audit.
 
@@ -56,13 +56,33 @@ that audit and the Node 24/26 CI matrix pass.
   of 400 when the limit was temporarily removed, then passed after restoration.
   Production audit exits zero at the high threshold with only qs (moderate)
   remaining. No live qBittorrent or deployment check was run.
-- qs slice complete locally as 2.1.3: qs 6.15.2 -> 6.16.0 and its required
+- qs slice committed as `9dd7bba` (2.1.3): qs 6.15.2 -> 6.16.0 and its required
   side-channel 1.1.0 -> 1.1.1. No other package versions changed. On Node
   26.8.2/npm 12.0.2, `npm ci`, lint, typecheck, all 176 tests, build, and
   `npm audit --omit=dev --audit-level=high` passed; the audit reports zero
   vulnerabilities. `npm ls multer qs --all` confirms Multer 2.3.0 and one
   deduplicated qs 6.16.0 used by Express, body-parser, and Superagent.
-- GitHub rerun, Node 24 verification, and deployment have not been performed.
-  Both remote main refs were `2d380ff` at startup; the fixed commits are local
-  until publication is approved. Pre-existing untracked `.agents/machines.md`
+- Owner approved publication and GitHub verification on 2026-09-14. Both
+  remotes were pushed and their main refs verified at `9dd7bba` using
+  `git ls-remote`.
+- [GitHub Audit](https://github.com/roethlar/qbit-mobile/actions/runs/34852542409)
+  passed on `9dd7bba`, reporting zero production vulnerabilities.
+- [GitHub CI](https://github.com/roethlar/qbit-mobile/actions/runs/34852543339)
+  passed on `9dd7bba`: clean install, lint, typecheck, tests, and build on both
+  Node 24 and Node 26.
+- Deployment was not performed. Pre-existing untracked `.agents/machines.md`
   and `.agents/plans/repo-review-fixes-2026-07.md` were left untouched.
+
+## Follow-up: development dependency alerts
+
+After publication, the GitHub Dependabot API reported 10 open alerts, all marked
+development scope. These were outside the production audit that failed. As of
+2026-09-14:
+
+- High: js-yaml (#50), browserslist (#41), fast-uri (#35, #36, #38, #39).
+- Medium: baseline-browser-mapping (#49), vitest (#45), @vitest/mocker (#44).
+- Low: postcss-selector-parser (#34).
+
+Source: [repository Dependabot alerts](https://github.com/roethlar/qbit-mobile/security/dependabot).
+Recommended next action: assess applicability and prepare targeted updates for
+these development dependencies. No changes to them were made in this remediation.
