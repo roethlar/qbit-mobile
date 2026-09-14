@@ -99,7 +99,7 @@ and the existing audit workflow policy.
 | fast-uri | 3.1.6 | Updated 3.1.5 -> 3.1.7 in 2.1.5; all checks pass; five affected packages remain |
 | baseline-browser-mapping | 2.11.0 | Updated 2.10.30 -> 2.11.23 in 2.1.6; all checks pass; four affected packages remain |
 | browserslist | 4.28.7 | Updated 4.28.2 -> 4.28.9 with required browser datasets in 2.1.7; all checks pass; three affected packages remain |
-| postcss-selector-parser | 6.1.3 | Pending |
+| postcss-selector-parser | 6.1.3 | Updated 6.1.2 -> 6.1.4 in 2.1.8; all checks pass; only the two Vitest packages remain |
 | vitest and @vitest/mocker | 4.1.11 | Pending |
 
 For completed rows, "all checks pass" means `npm ci`, lint, typecheck, all 176
