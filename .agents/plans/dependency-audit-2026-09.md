@@ -1,7 +1,7 @@
 # September 2026 dependency audit remediation
 
-Status: Production remediation published; full audit remediation in progress,
-2026-09-14.
+Status: Full audit remediation verified locally; publication and GitHub
+verification in progress, 2026-09-14.
 Scope authorized by the owner's instruction to investigate and remediate the
 failed GitHub audit.
 
@@ -100,7 +100,7 @@ and the existing audit workflow policy.
 | baseline-browser-mapping | 2.11.0 | Updated 2.10.30 -> 2.11.23 in 2.1.6; all checks pass; four affected packages remain |
 | browserslist | 4.28.7 | Updated 4.28.2 -> 4.28.9 with required browser datasets in 2.1.7; all checks pass; three affected packages remain |
 | postcss-selector-parser | 6.1.3 | Updated 6.1.2 -> 6.1.4 in 2.1.8; all checks pass; only the two Vitest packages remain |
-| vitest and @vitest/mocker | 4.1.11 | Pending |
+| vitest and @vitest/mocker | 4.1.11 | Updated 4.1.6 -> 4.1.11 with matching Vitest packages in 2.1.9; all checks pass; zero affected packages remain |
 
 For completed rows, "all checks pass" means `npm ci`, lint, typecheck, all 176
 tests, and production build on Node 26.8.2/npm 12.0.2. Remaining package counts
@@ -111,6 +111,14 @@ the PTK exception response did not retain the test diagnostic. A direct rerun
 passed all 176 tests, and a subsequent clean install plus all four checks also
 passed. Cause is unverified; no test or guard was disabled. Final GitHub matrix
 verification remains required.
+
+Final local results for 2.1.9: clean installation, lint, typecheck, 176 tests,
+and build passed. Both `npm audit --audit-level=low` and
+`npm audit --omit=dev --audit-level=high` exited zero and reported zero
+vulnerabilities. `npm ls` confirms patched versions throughout the affected
+dependency tree. Only dependency manifests/lockfile and `.agents/` records
+changed in the expanded remediation; no application code, tests, or CI gates
+were changed.
 
 Completion requires all of the following on the final dependency tree:
 

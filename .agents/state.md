@@ -6,9 +6,10 @@ short and update it when important repo facts change.
 ## Now
 
 - The owner expanded the 2026-09-14 remediation to **every audit and test**.
-  Local version **2.1.8** also patches the CSS selector parser; only the two
-  Vitest packages remain in the full audit. Clean install and all repository
-  checks pass. Canonical scope, checklist,
+  Local version **2.1.9** fixes all remaining development dependency findings.
+  Full and production npm audits report zero vulnerabilities. Clean install,
+  lint, typecheck, all 176 tests, and build pass. Publication and GitHub
+  verification are in progress. Canonical scope, checklist,
   and per-dependency results: `.agents/plans/dependency-audit-2026-09.md`.
 - The 2026-09-14 GitHub audit failure is fixed and published as **2.1.3**. Multer 2.3.0
   plus an explicit multipart field array-index limit fixes the high-severity
