@@ -5,11 +5,14 @@ short and update it when important repo facts change.
 
 ## Now
 
-- **October 2026 audit remediation in progress** (`.agents/plans/dependency-audit-2026-10.md`).
-  The weekly GitHub Audit failed on 2026-10-12 against 2.1.9 with four new
-  production advisories: proxy-addr (critical), axios (high), multer and
-  ip-address (moderate). Fixed so far: proxy-addr 2.0.8 as **2.1.10**, axios 1.20.0 as **2.1.11**, multer 2.4.0 as **2.1.12**. Remaining:
-  ip-address 10.7.4. Not yet pushed.
+- **October 2026 audit remediation fixed locally as 2.1.10 through 2.1.13**
+  (`a6d6349`..HEAD), one advisory per commit: proxy-addr 2.0.8 (critical),
+  axios 1.20.0 (high), multer 2.4.0 and ip-address 10.7.4 (moderate). The
+  weekly GitHub Audit had failed on 2026-10-12 against 2.1.9. Production audit
+  is now zero; clean install, lint, typecheck, 176 tests, and build pass.
+  **Not yet pushed**: both remotes remain at `e6c16c2` (2.1.9) under the
+  ask-first push policy. Dev-only audit findings remain and are recorded as
+  out of scope. Canonical record: `.agents/plans/dependency-audit-2026-10.md`.
 - The 2026-09-14 audit remediation is complete and published as **2.1.9**
   (`78cd9e3`) to origin and the GitHub mirror. Full and production npm audits
   report zero vulnerabilities, including development dependencies. GitHub
@@ -39,6 +42,12 @@ short and update it when important repo facts change.
 
 ## Next
 
+- **Owner go to push 2.1.13** to origin and github, then dispatch the Audit
+  workflow and confirm it and the Node 24/26 CI matrix pass.
+- **Owner decision on dev-dependency audit findings** (10, none shipped to
+  users): in-range fixes for brace-expansion, fast-uri, source-map-js now;
+  Tailwind 3 -> 4 migration separately for the rest. Details in
+  `.agents/plans/dependency-audit-2026-10.md`.
 - **Owner run of `deploy.ps1` on Windows.** The rewrite parses clean under pwsh 7.6 and
   its staging loop was executed verbatim on macOS, but the Scheduled Task paths (swap
   under a running task, rollback, post-swap ACL) cannot be exercised off-Windows.
