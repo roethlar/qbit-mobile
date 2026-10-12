@@ -8,8 +8,8 @@ short and update it when important repo facts change.
 - **October 2026 audit remediation in progress** (`.agents/plans/dependency-audit-2026-10.md`).
   The weekly GitHub Audit failed on 2026-10-12 against 2.1.9 with four new
   production advisories: proxy-addr (critical), axios (high), multer and
-  ip-address (moderate). Fixed so far: proxy-addr 2.0.8 as **2.1.10**. Remaining:
-  axios 1.20.0, multer 2.4.0, ip-address 10.7.4, one commit each. Not yet pushed.
+  ip-address (moderate). Fixed so far: proxy-addr 2.0.8 as **2.1.10**, axios 1.20.0 as **2.1.11**. Remaining:
+  multer 2.4.0, ip-address 10.7.4, one commit each. Not yet pushed.
 - The 2026-09-14 audit remediation is complete and published as **2.1.9**
   (`78cd9e3`) to origin and the GitHub mirror. Full and production npm audits
   report zero vulnerabilities, including development dependencies. GitHub

@@ -78,3 +78,7 @@ Node 24/26 CI matrix pass.
   no other package changed. On Node 26.11.1/npm 11.20.0, `npm ci`, lint,
   typecheck, all 176 tests in 13 files, and build passed. Production audit now
   reports 3 findings (1 high, 2 moderate); the critical finding is gone.
+- axios slice (2.1.11): axios 1.18.1 -> 1.20.0, requirement `^1.20.0`; the
+  only other lockfile change is axios's own form-data range (`^4.0.6`, already
+  installed). Lint, typecheck, all 176 tests, and build passed. Production
+  audit at the high threshold now exits zero; 2 moderate findings remain.
