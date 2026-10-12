@@ -82,3 +82,8 @@ Node 24/26 CI matrix pass.
   only other lockfile change is axios's own form-data range (`^4.0.6`, already
   installed). Lint, typecheck, all 176 tests, and build passed. Production
   audit at the high threshold now exits zero; 2 moderate findings remain.
+- multer slice (2.1.12): multer 2.3.0 -> 2.4.0, requirement `^2.4.0`. Multer
+  2.4.0 no longer depends on concat-stream, so concat-stream, readable-stream,
+  safe-buffer, string_decoder, and typedarray left the lockfile and buffer-from
+  and util-deprecate became dev-only. Lint, typecheck, all 176 tests, and build
+  passed. Production audit: 1 moderate finding (ip-address) remains.
