@@ -149,6 +149,7 @@ dev-only dependency fixes.
 | source-map-js | 1.2.1 | high (GHSA-68fv-2mgg-jv7q) | dev, via postcss | 1.2.2 | Build-time only. Fixed inside the vite slice: vite 8.3.5 needs postcss `^8.5.30`, and postcss 8.5.31 needs source-map-js `^1.2.2`. |
 | brace-expansion | 1.1.18, 2.1.4, 5.0.9 | high (GHSA-qhr7-859c-m2p7, GHSA-6j4f-fj2g-mc7p), moderate (GHSA-q2hr-2g5m-vwhr) | dev, via minimatch (eslint, typescript-eslint, tailwind's sucrase/glob, workbox-build) | 1.1.21, 2.1.7, 5.0.12 | Build/lint-time glob expansion of repo-controlled patterns only. |
 | @vitest/mocker (vitest) | 4.1.11 | moderate (GHSA-qxg6-89mg-rqv8, GHSA-xp26-3454-mjgp) | dev, direct (vitest) | 4.1.12 | Test runner only; `vitest run` in CI and locally. |
+| fast-uri | 3.1.7 | moderate (GHSA-hrr3-gc8f-f4qj, GHSA-w74x-v6f9-j3xg, GHSA-wjr9-j795-jxcr), low (GHSA-xhq7-xmqj-769h, GHSA-333x-w4r6-6crp) | dev, via ajv in workbox-build | 3.1.9 | Build-time schema validation of the repo's own PWA config only. |
 
 Verification note (this host): the working tree is checked out with
 `core.autocrlf=true`, and a CRLF after the `#!` line of `server/server.js`
@@ -186,3 +187,5 @@ Results:
 - vitest slice (2.1.20): vitest and its @vitest/* packages 4.1.11 -> 4.1.12,
   requirement `^4.1.12`; subtree chai 6.3.0, tinyrainbow 3.2.0. Lint,
   typecheck, 181 tests, build pass in both trees.
+- fast-uri slice (2.1.21): fast-uri 3.1.7 -> 3.1.9, lockfile only; no other
+  package changed. Lint, typecheck, 181 tests, build pass in both trees.
