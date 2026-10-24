@@ -136,12 +136,17 @@ planned change.
 
 New advisories published after 2.1.14. Same method as the first wave: one
 package per commit, patch bump each, in-range versions only, no `--force`.
+Dev-only slices bump too: the Versioning rule in `.agents/repo-guidance.md`
+exempts only `.agents/`, docs, tests, and CI commits, and 2.1.4-2.1.9 bumped
+dev-only dependency fixes.
 
 | Package | Installed | Severity | Scope | Patched in | Applicability |
 | --- | --- | --- | --- | --- | --- |
 | body-parser | 2.3.0 | high (GHSA-27r3-jxmh-p828) | prod, via express | 2.4.0 | Not reachable: both parsers set `inflate: false` (2.1.14), which returns 415 before any decompression. Upgraded for a clean audit. |
 | follow-redirects | 1.16.0 | high (GHSA-q3jh-wrc6-jgq8, GHSA-8r9p-f939-6h3c) | prod, via axios | 1.16.1 | Low: axios follows redirects from the configured qBittorrent host, but `server/qbClient.js` sends `Cookie` as a string and sets no `sensitiveHeaders`; both bugs bypass credential stripping only through those inputs. Upgraded regardless. |
 | multer | 2.4.0 | high (GHSA-q7qp-rjg7-q26m) | prod, direct | 2.5.0 | Does not match the configuration: the DoS needs an asynchronous `fileFilter` still pending at request teardown, and `server/routes/torrents.js` sets none. 2.5.0 also keeps an error listener on busboy after teardown and stops off-by-one truncation at busboy's default 1MB `fieldSize`; neither changes the app's limits. |
+| vite | 8.0.16 | high (GHSA-587h-7wmj-h5pm), moderate (GHSA-698v-4r3x-3vcv, GHSA-r825-w8mm-5pxw, GHSA-rq7h-c2jc-7f22), low (GHSA-9jrq-w75r-8gcw) | dev, direct | 8.1.6 (`npm audit fix` resolves 8.3.5) | Dev server only (launch-editor, `server.fs.allow`, middleware); `npm run dev` binds loopback by default. Vite builds the shipped bundle, so it bumps the version. |
+| source-map-js | 1.2.1 | high (GHSA-68fv-2mgg-jv7q) | dev, via postcss | 1.2.2 | Build-time only. Fixed inside the vite slice: vite 8.3.5 needs postcss `^8.5.30`, and postcss 8.5.31 needs source-map-js `^1.2.2`. |
 
 Verification note (this host): the working tree is checked out with
 `core.autocrlf=true`, and a CRLF after the `#!` line of `server/server.js`
@@ -162,3 +167,14 @@ Results:
 - multer slice (2.1.17): multer 2.4.0 -> 2.5.0, requirement `^2.5.0`; no
   other package changed. LF clone: lint, typecheck, 181 tests, build pass.
   Production audit: zero vulnerabilities.
+- vite slice (2.1.18): vite 8.0.16 -> 8.3.5, requirement `^8.3.5`. Its
+  subtree moved rolldown 1.0.3 -> 1.2.15 (with @oxc-project/types and the
+  platform bindings; the wasm32 binding and its @emnapi/@napi-rs/@tybys/tslib
+  deps left the lockfile), lightningcss 1.33.0, picomatch 4.0.7, postcss
+  8.5.31, nanoid 3.3.20, and source-map-js 1.2.2, which clears that advisory
+  too. Lint, typecheck, 181 tests, build pass in both trees: vite 8.3.5's
+  module runner handles the CRLF shebang, so the proxy suite loads in the
+  CRLF tree again. The build emits the same file set as 2.1.17; the only
+  visible output change is that the inline `<style>` in `index.html` is now
+  minified and drops the `-moz-user-select` prefix (assumption: harmless, as
+  Firefox has supported unprefixed `user-select` since 69).
