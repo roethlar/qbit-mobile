@@ -57,10 +57,16 @@ Status: Active (revised by owner instruction 2026-07-27; supersedes the earlier
 22.12 floor and Node 22/24 matrix)
 
 Decision:
-The supported Node version is `>=24.0.0` (`package.json` `engines`). CI exercises both
-Node 24 (the declared floor) and Node 26 via a build matrix. `deploy.sh`,
+The supported Node version is `>=24.22.1` (`package.json` `engines`). CI exercises both
+Node 24 (the declared floor's line) and Node 26 via a build matrix. `deploy.sh`,
 `deploy-macos.sh`, and `deploy.ps1` derive and enforce the same floor from
-`package.json`.
+`package.json`, comparing major.minor.patch.
+
+Revised 2026-10-23: the floor moved from `>=24.0.0` to `>=24.22.1`, the patched Node 24
+release for the October 2026 Node security release (CVE-2026-111497, Brotli decoder
+RCE). A plain `>=` on the lowest supported line admits every later major, so an
+unpatched Node 26 below 26.12.1 still passes the check; the README tells Node 26 users
+to run 26.12.1 or newer.
 
 Reason:
 The earlier policy deferred this move until Node 26 entered LTS. The owner explicitly

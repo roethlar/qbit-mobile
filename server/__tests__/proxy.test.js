@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import request from 'supertest';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as zlib from 'zlib';
 
 vi.mock('axios', () => ({
   default: vi.fn(),
@@ -72,6 +73,31 @@ describe('app auth', () => {
   it('does not require auth on the SPA shell or static assets', async () => {
     const res = await request(app).get('/');
     expect(res.status).not.toBe(401);
+  });
+});
+
+// The body parsers run before auth, so an inflating parser would hand any
+// client that can reach the port to the runtime's Brotli decoder
+// (CVE-2026-111497). Unauthenticated on purpose: refusal must precede auth.
+describe('compressed request bodies', () => {
+  it('refuses a Brotli JSON body with 415 before auth', async () => {
+    const res = await request(app)
+      .put('/api/locations')
+      .set('Content-Type', 'application/json')
+      .set('Content-Encoding', 'br')
+      .serialize((body) => body) // send the compressed bytes as-is
+      .send(zlib.brotliCompressSync(JSON.stringify({ locations: [] })));
+    expect(res.status).toBe(415);
+  });
+
+  it('refuses a gzip form body with 415 before auth', async () => {
+    const res = await request(app)
+      .post('/api/v2/torrents/stop')
+      .set('Content-Type', 'application/x-www-form-urlencoded')
+      .set('Content-Encoding', 'gzip')
+      .serialize((body) => body) // send the compressed bytes as-is
+      .send(zlib.gzipSync('hashes=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'));
+    expect(res.status).toBe(415);
   });
 });
 

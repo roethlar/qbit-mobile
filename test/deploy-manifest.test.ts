@@ -80,6 +80,12 @@ describe('deploy.ps1 stages the files git tracks', () => {
     expect(code).toContain('engines.node');
     expect(code, 'deploy.ps1 hardcodes a Node major').not.toMatch(/-lt\s+2[0-9]\b/);
   });
+
+  it('compares the patch level, not just major.minor', () => {
+    // A major.minor check lets an unpatched 24.22.0 through a 24.22.1 floor.
+    expect(code).toContain("'^>=(\\d+)\\.(\\d+)(?:\\.(\\d+))?'");
+    expect(code).toMatch(/\$nodeVerNum -lt \$floorVer/);
+  });
 });
 
 describe.each(GIT_STAGED_SCRIPTS)('%s stages the files git tracks', (script) => {
@@ -149,20 +155,27 @@ describe.each(GIT_STAGED_SCRIPTS)('%s reads the Node floor from package.json', (
     expect(code).toContain("engines.node");
     expect(code, `${script} hardcodes a Node major`).not.toMatch(/-lt\s+2[0-9]\b/);
   });
+
+  it('compares the patch level, not just major.minor', () => {
+    // A major.minor check lets an unpatched 24.22.0 through a 24.22.1 floor.
+    const code = stripComments(read(script));
+    expect(code).toMatch(/FLOOR_PATCH=\$\{FLOOR_PATCH:-0\}/);
+    expect(code).toMatch(/"\$NODE_PATCH" -lt "\$FLOOR_PATCH"/);
+  });
 });
 
 describe('engines.node stays in the form the deploy scripts can parse', () => {
   const enginesNode = (JSON.parse(read('package.json')) as { engines: { node: string } }).engines.node;
 
-  it('requires Node 24 or newer', () => {
-    expect(enginesNode).toBe('>=24.0.0');
+  it('requires Node 24.22.1 or newer (October 2026 security release)', () => {
+    expect(enginesNode).toBe('>=24.22.1');
   });
 
   it('engines.node stays in the >=X.Y.Z form', () => {
     // The scripts abort rather than guess when this does not match. Changing
     // engines.node to e.g. "^20.19.0 || >=22.12.0" would break every deploy, so
     // fail here instead -- in CI, where it is cheap.
-    const floor = /^>=(\d+)\.(\d+)/.exec(enginesNode);
+    const floor = /^>=(\d+)\.(\d+)(?:\.(\d+))?/.exec(enginesNode);
     expect(floor, `engines.node "${enginesNode}" is not a plain >=X.Y[.Z] range`).not.toBeNull();
   });
 });

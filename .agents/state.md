@@ -5,6 +5,16 @@ short and update it when important repo facts change.
 
 ## Now
 
+- **October 2026 Node security release fixed as 2.1.14** (2026-10-23, owner go):
+  `engines.node` raised to `>=24.22.1`, all three deploy scripts compare
+  major.minor.patch, and `express.json`/`express.urlencoded` set `inflate: false`
+  (CVE-2026-111497, Brotli decoder RCE, reachable before auth). Guarded by the
+  "compressed request bodies" tests in `server/__tests__/proxy.test.js`, proven to
+  fail (401, body inflated and reached auth) with the fix reverted. Lint,
+  typecheck, tests (181), and build pass on Node 26.12.1. Not run: the deploy
+  scripts on real hosts. Deployed hosts still need their Node upgraded to
+  24.22.1/26.12.1 and the service restarted. See the Node floor entry in
+  `.agents/decisions.md`.
 - **October 2026 audit remediation fixed locally as 2.1.10 through 2.1.13**
   (`a6d6349`..HEAD), one advisory per commit: proxy-addr 2.0.8 (critical),
   axios 1.20.0 (high), multer 2.4.0 and ip-address 10.7.4 (moderate). The

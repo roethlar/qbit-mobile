@@ -21,7 +21,7 @@ A modern, responsive web interface for qBittorrent optimized for mobile devices.
 
 ## Requirements
 
-- Node.js 24 or newer. CI tests against Node 24 and 26.
+- Node.js 24.22.1 or newer. On the Node 26 line, use 26.12.1 or newer: both are the October 2026 security releases, and the deploy scripts enforce only the 24.22.1 floor. CI tests against Node 24 and 26.
 - qBittorrent 4.x or 5.x with the Web UI enabled (the proxy auto-detects the API version)
 - qBittorrent configured to allow local authentication bypass (recommended) or with credentials
 
@@ -254,3 +254,4 @@ If you encounter any issues, please report them on the [GitHub issues page](http
 - systemd hardening: the unit file applies `NoNewPrivileges`, `ProtectSystem=strict`, `ProtectHome`, `ProtectKernel*`, `RestrictAddressFamilies=AF_INET AF_INET6`, an empty `CapabilityBoundingSet`, and a `@system-service` syscall filter. Use `systemd-analyze security qbit-mobile` to inspect.
 - App auth on by default: `AUTH_MODE=basic` is the default and the server refuses to boot without credentials. The proxy exposes only an allowlist of qBittorrent endpoints, so even an authenticated caller cannot reach `/app/shutdown` or set RCE-enabling preferences like `autorun_program`.
 - Torrent uploads accept up to 25 files of 10 MiB each and 30 text fields. Multipart field array indices above zero are rejected before parsing to prevent oversized sparse-array denial of service; the UI sends flat field names.
+- Compressed request bodies are refused: JSON and form bodies sent with a `Content-Encoding` (gzip, deflate, br) get `415` instead of being decompressed, because body parsing runs before auth. The UI never compresses request bodies.

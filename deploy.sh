@@ -74,22 +74,31 @@ done
 # The supported Node floor is declared once, in package.json `engines.node`, and
 # read from there. It used to be restated as a literal `22.12` here and in the
 # macOS and Windows scripts, which is how three copies drifted from the one that
-# matters. Enforce the minor too: a bare major check lets 22.0..22.11 through,
-# and the build then fails deep inside vite.
+# matters. Enforce major.minor.patch: a bare major check lets 22.0..22.11
+# through, and the build then fails deep inside vite; a major.minor check lets
+# an unpatched release through, e.g. 24.22.0 under a 24.22.1 security floor.
+# The floor is a plain semver `>=` on the lowest supported line, so later majors
+# pass. A `>=X.Y` floor with no patch is read as X.Y.0.
 ENGINES_NODE=$("${NODE_BIN}" -p "require('./package.json').engines.node" 2>/dev/null || true)
-NODE_FLOOR=$(printf '%s' "${ENGINES_NODE}" | sed -n 's/^>=\([0-9][0-9]*\.[0-9][0-9]*\).*/\1/p')
+NODE_FLOOR=$(printf '%s' "${ENGINES_NODE}" | sed -n 's/^>=\([0-9][0-9]*\.[0-9][0-9]*\(\.[0-9][0-9]*\)\{0,1\}\).*/\1/p')
 if [ -z "${NODE_FLOOR}" ]; then
-    print_error "Could not read a '>=X.Y' floor from package.json engines.node (got: '${ENGINES_NODE}')."
+    print_error "Could not read a '>=X.Y[.Z]' floor from package.json engines.node (got: '${ENGINES_NODE}')."
     exit 1
 fi
-FLOOR_MAJOR=${NODE_FLOOR%%.*}
-FLOOR_MINOR=${NODE_FLOOR##*.}
+FLOOR_MAJOR=$(echo "$NODE_FLOOR" | cut -d. -f1)
+FLOOR_MINOR=$(echo "$NODE_FLOOR" | cut -d. -f2)
+FLOOR_PATCH=$(echo "$NODE_FLOOR" | cut -d. -f3)
+FLOOR_PATCH=${FLOOR_PATCH:-0}
 
 NODE_VER_STR=$("${NODE_BIN}" -v | sed 's/^v//')
 NODE_MAJOR=$(echo "$NODE_VER_STR" | cut -d. -f1)
 NODE_MINOR=$(echo "$NODE_VER_STR" | cut -d. -f2)
+NODE_PATCH=$(echo "$NODE_VER_STR" | cut -d. -f3 | sed 's/[^0-9].*//')
+NODE_PATCH=${NODE_PATCH:-0}
 if [ "$NODE_MAJOR" -lt "$FLOOR_MAJOR" ] \
-   || { [ "$NODE_MAJOR" -eq "$FLOOR_MAJOR" ] && [ "$NODE_MINOR" -lt "$FLOOR_MINOR" ]; }; then
+   || { [ "$NODE_MAJOR" -eq "$FLOOR_MAJOR" ] && [ "$NODE_MINOR" -lt "$FLOOR_MINOR" ]; } \
+   || { [ "$NODE_MAJOR" -eq "$FLOOR_MAJOR" ] && [ "$NODE_MINOR" -eq "$FLOOR_MINOR" ] \
+        && [ "$NODE_PATCH" -lt "$FLOOR_PATCH" ]; }; then
     print_error "Node.js ${NODE_FLOOR}+ is required. Current version: v${NODE_VER_STR}"
     exit 1
 fi

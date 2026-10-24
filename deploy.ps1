@@ -75,23 +75,30 @@ foreach ($required in @('server','src','public','package.json')) {
 
 # The supported Node floor is declared once, in package.json `engines.node`, and
 # read from there. It used to be restated as a literal `22.12` here, which is how
-# this script drifted from the floor that matters. Enforce the minor too: a bare
-# major check lets 22.0..22.11 through, and the build then fails deep inside vite.
+# this script drifted from the floor that matters. Enforce major.minor.patch: a
+# bare major check lets 22.0..22.11 through, and the build then fails deep inside
+# vite; a major.minor check lets an unpatched release through, e.g. 24.22.0 under
+# a 24.22.1 security floor. The floor is a plain semver `>=` on the lowest
+# supported line, so later majors pass. A `>=X.Y` floor with no patch is read as
+# X.Y.0.
 $enginesNode = [string](& $NodeBin -p "require('./package.json').engines.node" 2>$null)
-$floorMatch = [regex]::Match($enginesNode, '^>=(\d+)\.(\d+)')
+$floorMatch = [regex]::Match($enginesNode, '^>=(\d+)\.(\d+)(?:\.(\d+))?')
 if (-not $floorMatch.Success) {
-    Write-Err "Could not read a '>=X.Y' floor from package.json engines.node (got: '$enginesNode')."
+    Write-Err "Could not read a '>=X.Y[.Z]' floor from package.json engines.node (got: '$enginesNode')."
     exit 1
 }
-$floorMajor = [int]$floorMatch.Groups[1].Value
-$floorMinor = [int]$floorMatch.Groups[2].Value
+$floorPatch = if ($floorMatch.Groups[3].Success) { [int]$floorMatch.Groups[3].Value } else { 0 }
+$floorVer = [version]::new([int]$floorMatch.Groups[1].Value, [int]$floorMatch.Groups[2].Value, $floorPatch)
 
 $nodeVer = (& $NodeBin -v).TrimStart('v')
-$verParts = $nodeVer.Split('.')
-$nodeMajor = [int]$verParts[0]
-$nodeMinor = [int]$verParts[1]
-if ($nodeMajor -lt $floorMajor -or ($nodeMajor -eq $floorMajor -and $nodeMinor -lt $floorMinor)) {
-    Write-Err "Node.js $floorMajor.$floorMinor+ is required. Current version: v$nodeVer"
+$verMatch = [regex]::Match($nodeVer, '^(\d+)\.(\d+)\.(\d+)')
+if (-not $verMatch.Success) {
+    Write-Err "Could not parse the Node.js version (got: 'v$nodeVer')."
+    exit 1
+}
+$nodeVerNum = [version]::new([int]$verMatch.Groups[1].Value, [int]$verMatch.Groups[2].Value, [int]$verMatch.Groups[3].Value)
+if ($nodeVerNum -lt $floorVer) {
+    Write-Err "Node.js $floorVer+ is required. Current version: v$nodeVer"
     exit 1
 }
 

@@ -27,8 +27,13 @@ const __dirname = path.dirname(__filename);
 
 export const app = express();
 
-app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+// inflate: false rejects Content-Encoding (gzip/deflate/br) request bodies with
+// 415 instead of decompressing them. These parsers run before auth, so any
+// client that can reach the port could otherwise feed the runtime's decoders
+// (CVE-2026-111497, Brotli decoder RCE). The frontend never compresses request
+// bodies.
+app.use(express.json({ limit: '1mb', inflate: false }));
+app.use(express.urlencoded({ extended: true, limit: '1mb', inflate: false }));
 
 // --- App auth -------------------------------------------------------------
 //
