@@ -114,6 +114,9 @@ Verified 2026-10-12 against 2.1.13 on Node 26.11.1 / npm 11.20.0:
 
 ## Out of scope: development dependency findings
 
+Superseded 2026-10-23: the second wave below took option (a) and fixed every
+in-range dev finding; only the Tailwind 4 item remains open.
+
 The full `npm audit --audit-level=low` (dev dependencies included) reports
 10 findings (7 high, 3 moderate), none reaching a deployed user and none
 checked by the GitHub Audit workflow. They were not touched because the
@@ -150,6 +153,7 @@ dev-only dependency fixes.
 | brace-expansion | 1.1.18, 2.1.4, 5.0.9 | high (GHSA-qhr7-859c-m2p7, GHSA-6j4f-fj2g-mc7p), moderate (GHSA-q2hr-2g5m-vwhr) | dev, via minimatch (eslint, typescript-eslint, tailwind's sucrase/glob, workbox-build) | 1.1.21, 2.1.7, 5.0.12 | Build/lint-time glob expansion of repo-controlled patterns only. |
 | @vitest/mocker (vitest) | 4.1.11 | moderate (GHSA-qxg6-89mg-rqv8, GHSA-xp26-3454-mjgp) | dev, direct (vitest) | 4.1.12 | Test runner only; `vitest run` in CI and locally. |
 | fast-uri | 3.1.7 | moderate (GHSA-hrr3-gc8f-f4qj, GHSA-w74x-v6f9-j3xg, GHSA-wjr9-j795-jxcr), low (GHSA-xhq7-xmqj-769h, GHSA-333x-w4r6-6crp) | dev, via ajv in workbox-build | 3.1.9 | Build-time schema validation of the repo's own PWA config only. |
+| serialize-javascript | 7.0.5 | low (GHSA-m5mm-p8h7-m29v) | dev, via @rollup/plugin-terser in workbox-build | 7.1.3 (`npm update` resolves 7.1.4) | Build-time only, serializing the repo's own service-worker config. 7.1.4 was hours old at install; it carries npm provenance and its only change from 7.1.3 is tighter function/class detection. |
 
 Verification note (this host): the working tree is checked out with
 `core.autocrlf=true`, and a CRLF after the `#!` line of `server/server.js`
@@ -189,3 +193,13 @@ Results:
   typecheck, 181 tests, build pass in both trees.
 - fast-uri slice (2.1.21): fast-uri 3.1.7 -> 3.1.9, lockfile only; no other
   package changed. Lint, typecheck, 181 tests, build pass in both trees.
+- serialize-javascript slice (2.1.22): 7.0.5 -> 7.1.4, lockfile only; no
+  other package changed. Lint, typecheck, 181 tests, build pass in both
+  trees. Production audit: zero. Full audit: 3 moderate, all below.
+
+Left unfixed: postcss-selector-parser 6.1.4 (GHSA-rj75-hqrm-r3gf, moderate,
+dev-only) via postcss-nested and tailwindcss 3.4.x. The only fix is
+tailwindcss 4 (semver major, a build and config migration), so it stays for
+a separately planned change. The in-range tailwindcss 3.4.19 does not fix it.
+
+Not run: the deploy scripts, a live qBittorrent check, and a push.

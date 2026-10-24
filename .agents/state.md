@@ -15,20 +15,19 @@ short and update it when important repo facts change.
   scripts on real hosts. Deployed hosts still need their Node upgraded to
   24.22.1/26.12.1 and the service restarted. See the Node floor entry in
   `.agents/decisions.md`.
-- **October 2026 audit remediation fixed locally as 2.1.10 through 2.1.13**
-  (`a6d6349`..HEAD), one advisory per commit: proxy-addr 2.0.8 (critical),
-  axios 1.20.0 (high), multer 2.4.0 and ip-address 10.7.4 (moderate). The
-  weekly GitHub Audit had failed on 2026-10-12 against 2.1.9. Production audit
-  is now zero; clean install, lint, typecheck, 176 tests, and build pass.
-  2.1.13 has since reached origin (`git ls-remote`, 2026-10-23).
-  Second wave, 2026-10-23, owner go "fix and commit everything else you can",
-  local only: body-parser 2.4.0 (high, 2.1.15), follow-redirects 1.16.1
-  (high, 2.1.16), multer 2.5.0 (high, 2.1.17); production audit zero again. Dev-only, one
-  per commit and each bumped, following the 2.1.4-2.1.9 precedent: vite 8.3.5 with
-  source-map-js 1.2.2 (high, 2.1.18), brace-expansion (high, 2.1.19), vitest 4.1.12
-  (moderate, 2.1.20), fast-uri 3.1.9 (moderate, 2.1.21). On this host the CRLF
-  checkout breaks loading `proxy.test.js` (pre-existing, environmental); each
-  slice is also verified in an LF clone. Canonical record:
+- **October 2026 audit remediation, one advisory package per commit.** First
+  wave 2.1.10-2.1.13 (`a6d6349`..`dd92959`, now on origin): proxy-addr 2.0.8
+  (critical), axios 1.20.0 (high), multer 2.4.0 and ip-address 10.7.4
+  (moderate). Second wave 2.1.15-2.1.22 (2026-10-23, owner go "fix and commit
+  everything else you can", **local only**): production body-parser 2.4.0,
+  follow-redirects 1.16.1, multer 2.5.0 (all high); dev-only vite 8.3.5 with
+  source-map-js 1.2.2, brace-expansion (high), vitest 4.1.12, fast-uri 3.1.9
+  (moderate), serialize-javascript 7.1.4 (low). Dev slices bump too, per the
+  2.1.4-2.1.9 precedent. Production audit zero; full audit leaves 3 moderate
+  (postcss-selector-parser under Tailwind 3, needs Tailwind 4). Lint,
+  typecheck, 181 tests, and build pass on Node 26.12.1. Before vite 8.3.5,
+  this host's CRLF checkout broke loading `proxy.test.js` (environmental), so
+  slices were also verified in an LF clone. Canonical record:
   `.agents/plans/dependency-audit-2026-10.md`.
 - The 2026-09-14 audit remediation is complete and published as **2.1.9**
   (`78cd9e3`) to origin and the GitHub mirror. Full and production npm audits
@@ -59,12 +58,10 @@ short and update it when important repo facts change.
 
 ## Next
 
-- **Owner go to push 2.1.13** to origin and github, then dispatch the Audit
+- **Owner go to push 2.1.14-2.1.22** to origin, then dispatch the Audit
   workflow and confirm it and the Node 24/26 CI matrix pass.
-- **Owner decision on dev-dependency audit findings** (10, none shipped to
-  users): in-range fixes for brace-expansion, fast-uri, source-map-js now;
-  Tailwind 3 -> 4 migration separately for the rest. Details in
-  `.agents/plans/dependency-audit-2026-10.md`.
+- **Plan the Tailwind 3 -> 4 migration** (semver major) to clear the last
+  dev-only finding, postcss-selector-parser GHSA-rj75-hqrm-r3gf (moderate).
 - **Owner run of `deploy.ps1` on Windows.** The rewrite parses clean under pwsh 7.6 and
   its staging loop was executed verbatim on macOS, but the Scheduled Task paths (swap
   under a running task, rollback, post-swap ACL) cannot be exercised off-Windows.
