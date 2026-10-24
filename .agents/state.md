@@ -5,11 +5,12 @@ short and update it when important repo facts change.
 
 ## Now
 
-- **v2.1.22 GitHub release in preparation** (2026-10-23): `CHANGELOG.md` has one
+- **v2.1.22 released on GitHub** (2026-10-24,
+  https://github.com/roethlar/qbit-mobile/releases/tag/v2.1.22, marked latest;
+  the previous release was v1.5.2). Annotated tag `v2.1.22` is on `a0d1a2b`,
+  the changelog commit, on both remotes. `CHANGELOG.md` has one
   `[2.1.22]` section covering 2.0.1-2.1.22, and its `[2.0.0]` section now also
-  records 1.6.7-1.6.9 (macOS/Windows deploy hardening, axios 1.18.1). The tag
-  `v2.1.22` (on the HEAD carrying this changelog commit) and the release itself
-  are not yet created; the last GitHub release is still v1.5.2. CI (run
+  records 1.6.7-1.6.9 (macOS/Windows deploy hardening, axios 1.18.1). CI (run
   40050409419, Node 24 and 26) and the dispatched Audit (run 40050424921) passed
   on `4f270da`, the 2.1.22 code commit.
 - **October 2026 Node security release fixed as 2.1.14** (2026-10-23, owner go):
