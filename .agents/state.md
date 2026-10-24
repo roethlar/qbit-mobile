@@ -5,6 +5,13 @@ short and update it when important repo facts change.
 
 ## Now
 
+- **v2.1.22 GitHub release in preparation** (2026-10-23): `CHANGELOG.md` has one
+  `[2.1.22]` section covering 2.0.1-2.1.22, and its `[2.0.0]` section now also
+  records 1.6.7-1.6.9 (macOS/Windows deploy hardening, axios 1.18.1). The tag
+  `v2.1.22` (on the HEAD carrying this changelog commit) and the release itself
+  are not yet created; the last GitHub release is still v1.5.2. CI (run
+  40050409419, Node 24 and 26) and the dispatched Audit (run 40050424921) passed
+  on `4f270da`, the 2.1.22 code commit.
 - **October 2026 Node security release fixed as 2.1.14** (2026-10-23, owner go):
   `engines.node` raised to `>=24.22.1`, all three deploy scripts compare
   major.minor.patch, and `express.json`/`express.urlencoded` set `inflate: false`
@@ -19,7 +26,7 @@ short and update it when important repo facts change.
   wave 2.1.10-2.1.13 (`a6d6349`..`dd92959`, now on origin): proxy-addr 2.0.8
   (critical), axios 1.20.0 (high), multer 2.4.0 and ip-address 10.7.4
   (moderate). Second wave 2.1.15-2.1.22 (2026-10-23, owner go "fix and commit
-  everything else you can", **local only**): production body-parser 2.4.0,
+  everything else you can", now on origin): production body-parser 2.4.0,
   follow-redirects 1.16.1, multer 2.5.0 (all high); dev-only vite 8.3.5 with
   source-map-js 1.2.2, brace-expansion (high), vitest 4.1.12, fast-uri 3.1.9
   (moderate), serialize-javascript 7.1.4 (low). Dev slices bump too, per the
@@ -58,8 +65,8 @@ short and update it when important repo facts change.
 
 ## Next
 
-- **Owner go to push 2.1.14-2.1.22** to origin, then dispatch the Audit
-  workflow and confirm it and the Node 24/26 CI matrix pass.
+- **Tag `v2.1.22` and publish the GitHub release** after owner review of the
+  release notes (outward-facing: needs its own go).
 - **Plan the Tailwind 3 -> 4 migration** (semver major) to clear the last
   dev-only finding, postcss-selector-parser GHSA-rj75-hqrm-r3gf (moderate).
 - **Owner run of `deploy.ps1` on Windows.** The rewrite parses clean under pwsh 7.6 and

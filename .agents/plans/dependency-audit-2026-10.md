@@ -1,9 +1,10 @@
 # October 2026 dependency audit remediation
 
 Status: First wave (2.1.10-2.1.13) fixed 2026-10-12 and since pushed to
-origin. Second wave (2.1.15 onward, below) fixed locally 2026-10-23; push
-awaits owner approval. Scope authorized by the owner's instructions "GH audit
-failures. fix." (first wave) and "fix and commit everything else you can"
+origin. Second wave (2.1.15 onward, below) fixed 2026-10-23 and since pushed
+to origin; GitHub CI (Node 24/26, run 40050409419) and the dispatched Audit
+(run 40050424921) passed on `4f270da` (2.1.22). Scope authorized by the
+owner's instructions "GH audit failures. fix." (first wave) and "fix and commit everything else you can"
 (second wave).
 
 ## Evidence
