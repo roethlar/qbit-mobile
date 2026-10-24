@@ -25,7 +25,8 @@ short and update it when important repo facts change.
   local only: body-parser 2.4.0 (high, 2.1.15), follow-redirects 1.16.1
   (high, 2.1.16), multer 2.5.0 (high, 2.1.17); production audit zero again. Dev-only, one
   per commit and each bumped, following the 2.1.4-2.1.9 precedent: vite 8.3.5 with
-  source-map-js 1.2.2 (high, 2.1.18), brace-expansion (high, 2.1.19). On this host the CRLF
+  source-map-js 1.2.2 (high, 2.1.18), brace-expansion (high, 2.1.19), vitest 4.1.12
+  (moderate, 2.1.20). On this host the CRLF
   checkout breaks loading `proxy.test.js` (pre-existing, environmental); each
   slice is also verified in an LF clone. Canonical record:
   `.agents/plans/dependency-audit-2026-10.md`.
