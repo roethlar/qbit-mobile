@@ -1,7 +1,10 @@
 # October 2026 dependency audit remediation
 
-Status: Fixed locally, 2026-10-12; publication awaits owner push approval.
-Scope authorized by the owner's instruction "GH audit failures. fix."
+Status: First wave (2.1.10-2.1.13) fixed 2026-10-12 and since pushed to
+origin. Second wave (2.1.15 onward, below) fixed locally 2026-10-23; push
+awaits owner approval. Scope authorized by the owner's instructions "GH audit
+failures. fix." (first wave) and "fix and commit everything else you can"
+(second wave).
 
 ## Evidence
 
@@ -128,3 +131,26 @@ Owner decision needed on whether to (a) apply the in-range dev fixes now,
 (b) also schedule the Tailwind 4 migration, or (c) leave dev findings to the
 Dependabot cadence. Recommendation: (a) now as patch slices; (b) as its own
 planned change.
+
+## Second wave (2026-10-23)
+
+New advisories published after 2.1.14. Same method as the first wave: one
+package per commit, patch bump each, in-range versions only, no `--force`.
+
+| Package | Installed | Severity | Scope | Patched in | Applicability |
+| --- | --- | --- | --- | --- | --- |
+| body-parser | 2.3.0 | high (GHSA-27r3-jxmh-p828) | prod, via express | 2.4.0 | Not reachable: both parsers set `inflate: false` (2.1.14), which returns 415 before any decompression. Upgraded for a clean audit. |
+
+Verification note (this host): the working tree is checked out with
+`core.autocrlf=true`, and a CRLF after the `#!` line of `server/server.js`
+makes Vitest's module runner fail to load `proxy.test.js` ("Invalid or
+unexpected token"). This reproduces on unmodified 2.1.14 and passes once that
+line is LF, so it is environmental, not a dependency regression. CI checks out
+LF. Each slice is therefore verified twice: in this tree (proxy suite excepted)
+and in an LF clone (`core.autocrlf=false`) after `npm ci`, where all suites run.
+
+Results:
+
+- body-parser slice (2.1.15): body-parser 2.3.0 -> 2.4.0, lockfile only; its
+  subtree moved qs 6.16.0 -> 6.16.1 and its nested content-type 2.0.0 -> 2.1.0.
+  LF clone: lint, typecheck, 181 tests, build pass.
