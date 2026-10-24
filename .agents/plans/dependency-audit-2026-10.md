@@ -140,6 +140,7 @@ package per commit, patch bump each, in-range versions only, no `--force`.
 | Package | Installed | Severity | Scope | Patched in | Applicability |
 | --- | --- | --- | --- | --- | --- |
 | body-parser | 2.3.0 | high (GHSA-27r3-jxmh-p828) | prod, via express | 2.4.0 | Not reachable: both parsers set `inflate: false` (2.1.14), which returns 415 before any decompression. Upgraded for a clean audit. |
+| follow-redirects | 1.16.0 | high (GHSA-q3jh-wrc6-jgq8, GHSA-8r9p-f939-6h3c) | prod, via axios | 1.16.1 | Low: axios follows redirects from the configured qBittorrent host, but `server/qbClient.js` sends `Cookie` as a string and sets no `sensitiveHeaders`; both bugs bypass credential stripping only through those inputs. Upgraded regardless. |
 
 Verification note (this host): the working tree is checked out with
 `core.autocrlf=true`, and a CRLF after the `#!` line of `server/server.js`
@@ -154,3 +155,6 @@ Results:
 - body-parser slice (2.1.15): body-parser 2.3.0 -> 2.4.0, lockfile only; its
   subtree moved qs 6.16.0 -> 6.16.1 and its nested content-type 2.0.0 -> 2.1.0.
   LF clone: lint, typecheck, 181 tests, build pass.
+- follow-redirects slice (2.1.16): follow-redirects 1.16.0 -> 1.16.1,
+  lockfile only; no other package changed. LF clone: lint, typecheck, 181
+  tests, build pass.
