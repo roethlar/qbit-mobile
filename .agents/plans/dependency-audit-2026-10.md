@@ -147,6 +147,7 @@ dev-only dependency fixes.
 | multer | 2.4.0 | high (GHSA-q7qp-rjg7-q26m) | prod, direct | 2.5.0 | Does not match the configuration: the DoS needs an asynchronous `fileFilter` still pending at request teardown, and `server/routes/torrents.js` sets none. 2.5.0 also keeps an error listener on busboy after teardown and stops off-by-one truncation at busboy's default 1MB `fieldSize`; neither changes the app's limits. |
 | vite | 8.0.16 | high (GHSA-587h-7wmj-h5pm), moderate (GHSA-698v-4r3x-3vcv, GHSA-r825-w8mm-5pxw, GHSA-rq7h-c2jc-7f22), low (GHSA-9jrq-w75r-8gcw) | dev, direct | 8.1.6 (`npm audit fix` resolves 8.3.5) | Dev server only (launch-editor, `server.fs.allow`, middleware); `npm run dev` binds loopback by default. Vite builds the shipped bundle, so it bumps the version. |
 | source-map-js | 1.2.1 | high (GHSA-68fv-2mgg-jv7q) | dev, via postcss | 1.2.2 | Build-time only. Fixed inside the vite slice: vite 8.3.5 needs postcss `^8.5.30`, and postcss 8.5.31 needs source-map-js `^1.2.2`. |
+| brace-expansion | 1.1.18, 2.1.4, 5.0.9 | high (GHSA-qhr7-859c-m2p7, GHSA-6j4f-fj2g-mc7p), moderate (GHSA-q2hr-2g5m-vwhr) | dev, via minimatch (eslint, typescript-eslint, tailwind's sucrase/glob, workbox-build) | 1.1.21, 2.1.7, 5.0.12 | Build/lint-time glob expansion of repo-controlled patterns only. |
 
 Verification note (this host): the working tree is checked out with
 `core.autocrlf=true`, and a CRLF after the `#!` line of `server/server.js`
@@ -178,3 +179,6 @@ Results:
   visible output change is that the inline `<style>` in `index.html` is now
   minified and drops the `-moz-user-select` prefix (assumption: harmless, as
   Firefox has supported unprefixed `user-select` since 69).
+- brace-expansion slice (2.1.19): all six copies updated in the lockfile
+  (1.1.18 -> 1.1.21 x3, 2.1.4 -> 2.1.7, 5.0.9 -> 5.0.12 x2); no other
+  package changed. Lint, typecheck, 181 tests, build pass in both trees.
