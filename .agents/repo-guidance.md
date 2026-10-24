@@ -56,7 +56,12 @@ or a clear note that it was not run.
 
 ## Remotes & Sync
 
-- `origin` — `http://q.internal:3000/michael/qbit-mobile` (fetch and push).
+- `origin` — `http://magneto:3001/michael/qbit-mobile.git`, the local Gitea (fetch and push).
+- `github` — `https://github.com/roethlar/qbit-mobile`. CI, the Audit workflow and the
+  GitHub releases run here.
+- Keep both remotes in sync with fast-forward pushes only; never force.
+- Retired (owner, 2026-10-24): `http://q.internal:3000/...` was the old `origin`. Host `q`
+  is gone, so that URL no longer applies.
 - Push policy is recorded separately in `.agents/push-policy.md`.
 
 ## Versioning
