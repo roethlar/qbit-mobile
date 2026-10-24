@@ -23,7 +23,7 @@ short and update it when important repo facts change.
   2.1.13 has since reached origin (`git ls-remote`, 2026-10-23).
   Second wave, 2026-10-23, owner go "fix and commit everything else you can",
   local only: body-parser 2.4.0 (high, 2.1.15), follow-redirects 1.16.1
-  (high, 2.1.16). On this host the CRLF
+  (high, 2.1.16), multer 2.5.0 (high, 2.1.17); production audit zero again. On this host the CRLF
   checkout breaks loading `proxy.test.js` (pre-existing, environmental); each
   slice is also verified in an LF clone. Canonical record:
   `.agents/plans/dependency-audit-2026-10.md`.
