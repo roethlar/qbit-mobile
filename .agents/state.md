@@ -66,8 +66,6 @@ short and update it when important repo facts change.
 
 ## Next
 
-- **Tag `v2.1.22` and publish the GitHub release** after owner review of the
-  release notes (outward-facing: needs its own go).
 - **Plan the Tailwind 3 -> 4 migration** (semver major) to clear the last
   dev-only finding, postcss-selector-parser GHSA-rj75-hqrm-r3gf (moderate).
 - **Owner run of `deploy.ps1` on Windows.** The rewrite parses clean under pwsh 7.6 and
